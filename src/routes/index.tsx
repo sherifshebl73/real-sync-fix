@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
       { title: "حُضور — إدارة الحضور والحصص بذكاء" },
       { name: "description", content: "نظام متكامل لإدارة اشتراكات وحضور الأنشطة الرياضية والأكاديميات." },
       { property: "og:title", content: "حُضور — إدارة الحضور والحصص بذكاء" },
-      { property: "og:description", content: "أنشطة، مشتركين، حضور، تنبيهات — كل شيء في مكان واحد." },
+      { property: "og:description", content: "نظام متكامل لإدارة اشتراكات وحضور الأنشطة الرياضية والأكاديميات." },
     ],
   }),
 });
