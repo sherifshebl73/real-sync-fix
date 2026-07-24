@@ -14,7 +14,164 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          color: string | null
+          created_at: string
+          days: string[]
+          id: string
+          instructor: string | null
+          location: string | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          days?: string[]
+          id?: string
+          instructor?: string | null
+          location?: string | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          days?: string[]
+          id?: string
+          instructor?: string | null
+          location?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      attendance: {
+        Row: {
+          activity_id: string | null
+          attendance_date: string
+          created_at: string
+          id: string
+          player_id: string
+          present: boolean
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          attendance_date?: string
+          created_at?: string
+          id?: string
+          player_id: string
+          present?: boolean
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          attendance_date?: string
+          created_at?: string
+          id?: string
+          player_id?: string
+          present?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      players: {
+        Row: {
+          activity_id: string | null
+          archived: boolean
+          created_at: string
+          id: string
+          name: string
+          note: string | null
+          receipt_number: string | null
+          registration_date: string
+          remaining_sessions: number
+          total_sessions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          archived?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          note?: string | null
+          receipt_number?: string | null
+          registration_date?: string
+          remaining_sessions?: number
+          total_sessions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          archived?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string | null
+          receipt_number?: string | null
+          registration_date?: string
+          remaining_sessions?: number
+          total_sessions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          academy_name: string
+          created_at: string
+          id: string
+          logo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          academy_name?: string
+          created_at?: string
+          id: string
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          academy_name?: string
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
