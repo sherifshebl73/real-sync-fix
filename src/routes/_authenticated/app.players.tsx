@@ -1,16 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Trash2, Pencil, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import type { Player, Activity } from "@/lib/hudoor-types";
+import type { Player, Activity, PlayerActivity } from "@/lib/hudoor-types";
 
 export const Route = createFileRoute("/_authenticated/app/players")({
   component: PlayersPage,
@@ -34,6 +33,18 @@ function PlayersPage() {
       if (error) throw error;
       return data as Player[];
     },
+  });
+
+  const { data: allLinks = [] } = useQuery({
+    queryKey: ["player_activities_all"],
+    queryFn: async () => (await supabase.from("player_activities").select("*")).data as PlayerActivity[] ?? [],
+  });
+
+  const linksByPlayer = new Map<string, string[]>();
+  allLinks.forEach(l => {
+    const arr = linksByPlayer.get(l.player_id) ?? [];
+    arr.push(l.activity_id);
+    linksByPlayer.set(l.player_id, arr);
   });
 
   const archive = useMutation({
@@ -60,7 +71,7 @@ function PlayersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["players"] }); toast.success("تم تجديد الاشتراك"); },
   });
 
-  const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || (p.receipt_number ?? "").includes(q));
 
   return (
     <div className="space-y-5">
@@ -75,14 +86,23 @@ function PlayersPage() {
           </DialogTrigger>
           <DialogContent dir="rtl">
             <DialogHeader><DialogTitle>{editing ? "تعديل المشترك" : "مشترك جديد"}</DialogTitle></DialogHeader>
-            <PlayerForm editing={editing} activities={activities} onDone={() => { setOpen(false); setEditing(null); qc.invalidateQueries({ queryKey: ["players"] }); }} />
+            <PlayerForm
+              editing={editing}
+              activities={activities}
+              initialActivityIds={editing ? (linksByPlayer.get(editing.id) ?? (editing.activity_id ? [editing.activity_id] : [])) : []}
+              onDone={() => {
+                setOpen(false); setEditing(null);
+                qc.invalidateQueries({ queryKey: ["players"] });
+                qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+              }}
+            />
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="relative">
         <Search className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="ابحث بالاسم…" value={q} onChange={e => setQ(e.target.value)} className="pe-9" />
+        <Input placeholder="ابحث بالاسم أو رقم الإيصال…" value={q} onChange={e => setQ(e.target.value)} className="pe-9" />
       </div>
 
       {isLoading ? <p className="text-sm text-muted-foreground">جاري التحميل…</p> :
@@ -93,7 +113,8 @@ function PlayersPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {filtered.map(p => {
-              const act = activities.find(a => a.id === p.activity_id);
+              const ids = linksByPlayer.get(p.id) ?? (p.activity_id ? [p.activity_id] : []);
+              const names = ids.map(id => activities.find(a => a.id === id)?.name).filter(Boolean) as string[];
               const pct = p.total_sessions > 0 ? (p.remaining_sessions / p.total_sessions) * 100 : 0;
               const low = p.remaining_sessions <= 2;
               return (
@@ -101,7 +122,10 @@ function PlayersPage() {
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-base font-bold">{p.name}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{act?.name ?? "بدون نشاط"} {p.receipt_number ? `• إيصال #${p.receipt_number}` : ""}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {names.length > 0 ? names.join(" • ") : "بدون نشاط"}
+                        {p.receipt_number ? ` • إيصال #${p.receipt_number}` : ""}
+                      </div>
                     </div>
                     <div className="flex gap-0.5">
                       <Button variant="ghost" size="icon" onClick={() => { setEditing(p); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
@@ -129,15 +153,24 @@ function PlayersPage() {
   );
 }
 
-function PlayerForm({ editing, activities, onDone }: { editing: Player | null; activities: Activity[]; onDone: () => void }) {
+function PlayerForm({ editing, activities, initialActivityIds, onDone }: {
+  editing: Player | null;
+  activities: Activity[];
+  initialActivityIds: string[];
+  onDone: () => void;
+}) {
   const [name, setName] = useState(editing?.name ?? "");
-  const [activityId, setActivityId] = useState(editing?.activity_id ?? "");
+  const [activityIds, setActivityIds] = useState<string[]>(initialActivityIds);
   const [regDate, setRegDate] = useState(editing?.registration_date ?? new Date().toISOString().slice(0, 10));
   const [receipt, setReceipt] = useState(editing?.receipt_number ?? "");
   const [total, setTotal] = useState(editing?.total_sessions ?? 8);
   const [remaining, setRemaining] = useState(editing?.remaining_sessions ?? 8);
   const [note, setNote] = useState(editing?.note ?? "");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setActivityIds(initialActivityIds); }, [editing?.id]);
+
+  const toggle = (id: string) => setActivityIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,9 +179,10 @@ function PlayerForm({ editing, activities, onDone }: { editing: Player | null; a
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("غير مسجل");
+      const primary = activityIds[0] ?? null;
       const payload = {
         name: name.trim(),
-        activity_id: activityId || null,
+        activity_id: primary,
         registration_date: regDate,
         receipt_number: receipt || null,
         total_sessions: Number(total),
@@ -156,15 +190,27 @@ function PlayerForm({ editing, activities, onDone }: { editing: Player | null; a
         note: note || null,
         user_id: user.id,
       };
+
+      let playerId: string;
       if (editing) {
         const { error } = await supabase.from("players").update(payload).eq("id", editing.id);
         if (error) throw error;
-        toast.success("تم التحديث");
+        playerId = editing.id;
       } else {
-        const { error } = await supabase.from("players").insert(payload);
+        const { data, error } = await supabase.from("players").insert(payload).select("id").single();
         if (error) throw error;
-        toast.success("تمت الإضافة");
+        playerId = data!.id;
       }
+
+      // Sync junction
+      await supabase.from("player_activities").delete().eq("player_id", playerId);
+      if (activityIds.length > 0) {
+        const rows = activityIds.map(aid => ({ user_id: user.id, player_id: playerId, activity_id: aid }));
+        const { error: linkErr } = await supabase.from("player_activities").insert(rows);
+        if (linkErr) throw linkErr;
+      }
+
+      toast.success(editing ? "تم التحديث" : "تمت الإضافة");
       onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "خطأ");
@@ -174,15 +220,24 @@ function PlayerForm({ editing, activities, onDone }: { editing: Player | null; a
   return (
     <form onSubmit={submit} className="space-y-4 max-h-[70vh] overflow-y-auto pe-1">
       <div className="space-y-1.5"><Label>اسم المشترك *</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
-      <div className="space-y-1.5">
-        <Label>النشاط</Label>
-        <Select value={activityId ?? ""} onValueChange={setActivityId}>
-          <SelectTrigger><SelectValue placeholder="اختر نشاطاً" /></SelectTrigger>
-          <SelectContent>
-            {activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+
+      <div className="space-y-2">
+        <Label>الأنشطة {activityIds.length > 0 && <span className="text-xs text-muted-foreground">({activityIds.length} مختارة)</span>}</Label>
+        {activities.length === 0 ? (
+          <p className="text-xs text-muted-foreground">لا توجد أنشطة — أضف نشاطاً أولاً.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {activities.map(a => (
+              <button type="button" key={a.id} onClick={() => toggle(a.id)}
+                className={`rounded-full px-3 py-1.5 text-sm border transition ${activityIds.includes(a.id) ? "bg-brand text-brand-foreground border-brand" : "bg-card hover:bg-muted"}`}>
+                {a.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">يمكن اختيار أكثر من نشاط.</p>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5"><Label>تاريخ التسجيل</Label><Input type="date" value={regDate} onChange={e => setRegDate(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>رقم الإيصال</Label><Input value={receipt ?? ""} onChange={e => setReceipt(e.target.value)} /></div>
