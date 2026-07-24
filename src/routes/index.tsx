@@ -55,7 +55,7 @@ function Landing() {
           نسخة جديدة أنظف وأسرع
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground md:text-6xl">
-          أدر حضور طلابك<br />
+          أدر حضور مشتركيك<br />
           <span className="bg-gradient-to-l from-brand to-navy bg-clip-text text-transparent">بذكاء وبساطة</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
