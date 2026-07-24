@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, X, Save, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
-import type { Player, Activity, AttendanceRow } from "@/lib/hudoor-types";
+import type { Player, Activity, AttendanceRow, PlayerActivity } from "@/lib/hudoor-types";
 
 export const Route = createFileRoute("/_authenticated/app/attendance")({
   component: AttendancePage,
@@ -27,10 +27,19 @@ function AttendancePage() {
   });
 
   const { data: players = [] } = useQuery({
-    queryKey: ["players", activityId],
+    queryKey: ["players-by-activity", activityId],
     enabled: !!activityId,
     queryFn: async () => {
-      const { data } = await supabase.from("players").select("*").eq("archived", false).eq("activity_id", activityId).order("name");
+      // Get all player_ids linked to this activity (junction + legacy activity_id column)
+      const [linkRes, legacyRes] = await Promise.all([
+        supabase.from("player_activities").select("player_id").eq("activity_id", activityId),
+        supabase.from("players").select("id").eq("activity_id", activityId).eq("archived", false),
+      ]);
+      const ids = new Set<string>();
+      (linkRes.data as { player_id: string }[] | null)?.forEach(r => ids.add(r.player_id));
+      (legacyRes.data as { id: string }[] | null)?.forEach(r => ids.add(r.id));
+      if (ids.size === 0) return [];
+      const { data } = await supabase.from("players").select("*").in("id", Array.from(ids)).eq("archived", false).order("name");
       return (data ?? []) as Player[];
     },
   });
@@ -55,14 +64,12 @@ function AttendancePage() {
       const entries = Object.entries(marks);
       if (entries.length === 0) throw new Error("لم تقم بتحديد أي حضور");
 
-      // Upsert each attendance row
       const rows = entries.map(([player_id, present]) => ({
         user_id: user.id, player_id, activity_id: activityId, attendance_date: date, present,
       }));
       const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "player_id,attendance_date" });
       if (error) throw error;
 
-      // Decrement remaining_sessions ONLY for new "present" marks not already counted
       const existingMap = new Map(existing.map(r => [r.player_id, r.present]));
       for (const [pid, present] of entries) {
         const wasPresent = existingMap.get(pid);
@@ -80,6 +87,7 @@ function AttendancePage() {
     onSuccess: () => {
       toast.success("تم حفظ الحضور");
       qc.invalidateQueries({ queryKey: ["players"] });
+      qc.invalidateQueries({ queryKey: ["players-by-activity"] });
       qc.invalidateQueries({ queryKey: ["att", activityId, date] });
       qc.invalidateQueries({ queryKey: ["home-stats"] });
     },
@@ -87,6 +95,7 @@ function AttendancePage() {
   });
 
   const toggle = (id: string, val: boolean) => setMarks(prev => ({ ...prev, [id]: val }));
+  const markAll = (val: boolean) => setMarks(Object.fromEntries(players.map(p => [p.id, val])));
 
   return (
     <div className="space-y-5">
@@ -113,6 +122,10 @@ function AttendancePage() {
           <Card className="p-10 text-center text-muted-foreground">لا يوجد مشتركون في هذا النشاط.</Card>
         ) : (
           <>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => markAll(true)}>تحديد الكل حاضر</Button>
+              <Button size="sm" variant="outline" onClick={() => markAll(false)}>تحديد الكل غائب</Button>
+            </div>
             <Card className="p-2">
               <div className="divide-y">
                 {players.map(p => {
