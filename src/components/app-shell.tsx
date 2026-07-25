@@ -22,12 +22,18 @@ export function AppShell() {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [academy, setAcademy] = useState("أكاديميتي");
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("profiles").select("academy_name").maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("academy_name,logo_url").maybeSingle().then(async ({ data }) => {
       if (data?.academy_name) setAcademy(data.academy_name);
+      if (data?.logo_url) {
+        const { data: signed } = await supabase.storage.from("logos").createSignedUrl(data.logo_url, 60 * 60 * 24 * 365);
+        if (signed?.signedUrl) setCustomLogo(signed.signedUrl);
+      }
     });
   }, []);
+
 
   useEffect(() => { setOpen(false); }, [loc.pathname]);
 
