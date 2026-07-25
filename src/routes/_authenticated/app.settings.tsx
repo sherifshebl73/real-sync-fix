@@ -247,11 +247,38 @@ function SettingsPage() {
       </div>
 
       <Card className="p-6 space-y-4">
+        <h2 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-brand" /> لوجو الأكاديمية</h2>
+        <div className="flex items-center gap-4">
+          <div className="h-20 w-20 shrink-0 rounded-xl border overflow-hidden bg-muted flex items-center justify-center">
+            {logoUrl ? <img src={logoUrl} alt="logo" className="h-full w-full object-cover" /> : <ImageIcon className="h-8 w-8 text-muted-foreground" />}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => logoRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> رفع لوجو</Button>
+            {logoPath && <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={removeLogo}><Trash2 className="ms-1 h-4 w-4" /> حذف</Button>}
+            <input ref={logoRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ""; }} />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">PNG أو JPG، حجم أقصى 2MB. يظهر في الشريط الجانبي والتقارير.</p>
+      </Card>
+
+      <Card className="p-6 space-y-4">
         <h2 className="font-bold">بيانات الأكاديمية</h2>
         <div className="space-y-1.5"><Label>اسم الأكاديمية</Label><Input value={academy} onChange={e => setAcademy(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>البريد الإلكتروني</Label><Input value={email} disabled dir="ltr" /></div>
         <Button onClick={save} disabled={loading} className="gradient-brand text-brand-foreground"><Save className="ms-1 h-4 w-4" /> حفظ</Button>
       </Card>
+
+      <Card className="p-6 space-y-4">
+        <h2 className="font-bold flex items-center gap-2"><KeyRound className="h-5 w-5 text-brand" /> تغيير كلمة المرور</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>كلمة المرور الجديدة</Label><Input type="password" value={pwd1} onChange={e => setPwd1(e.target.value)} dir="ltr" /></div>
+          <div className="space-y-1.5"><Label>تأكيد كلمة المرور</Label><Input type="password" value={pwd2} onChange={e => setPwd2(e.target.value)} dir="ltr" /></div>
+        </div>
+        <Button onClick={changePassword} disabled={pwdLoading || !pwd1 || !pwd2} className="gradient-brand text-brand-foreground"><KeyRound className="ms-1 h-4 w-4" /> تحديث كلمة المرور</Button>
+        <p className="text-[11px] text-muted-foreground">6 أحرف على الأقل.</p>
+      </Card>
+
 
       <Card className="p-6 space-y-4">
         <div>
