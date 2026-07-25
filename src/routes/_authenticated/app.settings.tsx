@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { toCSV, downloadFile, parseCSV } from "@/lib/hudoor-types";
 
@@ -14,14 +14,21 @@ export const Route = createFileRoute("/_authenticated/app/settings")({
   component: SettingsPage,
 });
 
+
 function SettingsPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [academy, setAcademy] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [pwd1, setPwd1] = useState("");
+  const [pwd2, setPwd2] = useState("");
+  const [pwdLoading, setPwdLoading] = useState(false);
   const csvRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   const { data } = useQuery({
     queryKey: ["profile"],
@@ -33,9 +40,20 @@ function SettingsPage() {
   });
 
   useEffect(() => {
-    if (data?.profile) setAcademy(data.profile.academy_name);
+    if (data?.profile) {
+      setAcademy(data.profile.academy_name);
+      setLogoPath(data.profile.logo_url);
+    }
     if (data?.user) setEmail(data.user.email ?? "");
   }, [data]);
+
+  // Resolve signed URL for private logo
+  useEffect(() => {
+    if (!logoPath) { setLogoUrl(null); return; }
+    supabase.storage.from("logos").createSignedUrl(logoPath, 60 * 60 * 24 * 365).then(({ data }) => {
+      if (data?.signedUrl) setLogoUrl(data.signedUrl);
+    });
+  }, [logoPath]);
 
   const save = async () => {
     setLoading(true);
@@ -43,15 +61,62 @@ function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("profiles").update({ academy_name: academy }).eq("id", user!.id);
       if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["profile"] });
       toast.success("تم الحفظ");
     } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
     finally { setLoading(false); }
+  };
+
+  const uploadLogo = async (file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("غير مسجل");
+      if (file.size > 2 * 1024 * 1024) throw new Error("حجم الصورة أكبر من 2MB");
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${user.id}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      // Remove old
+      if (logoPath) await supabase.storage.from("logos").remove([logoPath]);
+      const { error } = await supabase.from("profiles").update({ logo_url: path }).eq("id", user.id);
+      if (error) throw error;
+      setLogoPath(path);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("تم رفع اللوجو");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+  };
+
+  const removeLogo = async () => {
+    if (!logoPath) return;
+    if (!confirm("حذف اللوجو؟")) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.storage.from("logos").remove([logoPath]);
+      await supabase.from("profiles").update({ logo_url: null }).eq("id", user!.id);
+      setLogoPath(null); setLogoUrl(null);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("تم الحذف");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+  };
+
+  const changePassword = async () => {
+    if (pwd1.length < 6) return toast.error("كلمة المرور 6 أحرف على الأقل");
+    if (pwd1 !== pwd2) return toast.error("كلمتا المرور غير متطابقتين");
+    setPwdLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pwd1 });
+      if (error) throw error;
+      setPwd1(""); setPwd2("");
+      toast.success("تم تغيير كلمة المرور");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+    finally { setPwdLoading(false); }
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     nav({ to: "/auth" });
   };
+
 
   // ---------- Export players CSV ----------
   const exportPlayersCSV = async () => {
@@ -182,11 +247,38 @@ function SettingsPage() {
       </div>
 
       <Card className="p-6 space-y-4">
+        <h2 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-brand" /> لوجو الأكاديمية</h2>
+        <div className="flex items-center gap-4">
+          <div className="h-20 w-20 shrink-0 rounded-xl border overflow-hidden bg-muted flex items-center justify-center">
+            {logoUrl ? <img src={logoUrl} alt="logo" className="h-full w-full object-cover" /> : <ImageIcon className="h-8 w-8 text-muted-foreground" />}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => logoRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> رفع لوجو</Button>
+            {logoPath && <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={removeLogo}><Trash2 className="ms-1 h-4 w-4" /> حذف</Button>}
+            <input ref={logoRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ""; }} />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">PNG أو JPG، حجم أقصى 2MB. يظهر في الشريط الجانبي والتقارير.</p>
+      </Card>
+
+      <Card className="p-6 space-y-4">
         <h2 className="font-bold">بيانات الأكاديمية</h2>
         <div className="space-y-1.5"><Label>اسم الأكاديمية</Label><Input value={academy} onChange={e => setAcademy(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>البريد الإلكتروني</Label><Input value={email} disabled dir="ltr" /></div>
         <Button onClick={save} disabled={loading} className="gradient-brand text-brand-foreground"><Save className="ms-1 h-4 w-4" /> حفظ</Button>
       </Card>
+
+      <Card className="p-6 space-y-4">
+        <h2 className="font-bold flex items-center gap-2"><KeyRound className="h-5 w-5 text-brand" /> تغيير كلمة المرور</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>كلمة المرور الجديدة</Label><Input type="password" value={pwd1} onChange={e => setPwd1(e.target.value)} dir="ltr" /></div>
+          <div className="space-y-1.5"><Label>تأكيد كلمة المرور</Label><Input type="password" value={pwd2} onChange={e => setPwd2(e.target.value)} dir="ltr" /></div>
+        </div>
+        <Button onClick={changePassword} disabled={pwdLoading || !pwd1 || !pwd2} className="gradient-brand text-brand-foreground"><KeyRound className="ms-1 h-4 w-4" /> تحديث كلمة المرور</Button>
+        <p className="text-[11px] text-muted-foreground">6 أحرف على الأقل.</p>
+      </Card>
+
 
       <Card className="p-6 space-y-4">
         <div>

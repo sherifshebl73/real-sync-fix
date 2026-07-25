@@ -22,12 +22,18 @@ export function AppShell() {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [academy, setAcademy] = useState("أكاديميتي");
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("profiles").select("academy_name").maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("academy_name,logo_url").maybeSingle().then(async ({ data }) => {
       if (data?.academy_name) setAcademy(data.academy_name);
+      if (data?.logo_url) {
+        const { data: signed } = await supabase.storage.from("logos").createSignedUrl(data.logo_url, 60 * 60 * 24 * 365);
+        if (signed?.signedUrl) setCustomLogo(signed.signedUrl);
+      }
     });
   }, []);
+
 
   useEffect(() => { setOpen(false); }, [loc.pathname]);
 
@@ -46,7 +52,7 @@ export function AppShell() {
       <header className="sticky top-0 z-40 border-b bg-card/80 backdrop-blur md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <img src={logo.url} alt="حُضور" className="h-9 w-9 rounded-lg object-cover" />
+            <img src={customLogo ?? logo.url} alt="حُضور" className="h-9 w-9 rounded-lg object-cover" />
             <div className="text-sm font-bold">{academy}</div>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setOpen(v => !v)}>
@@ -60,7 +66,7 @@ export function AppShell() {
         <aside className={`${open ? "block" : "hidden"} md:block fixed md:sticky md:top-0 inset-y-0 right-0 z-30 h-screen w-64 shrink-0 border-l bg-card`}>
           <div className="flex h-full flex-col p-4">
             <Link to="/app" className="mb-6 flex items-center gap-3 rounded-xl p-2 hover:bg-muted">
-              <img src={logo.url} alt="حُضور" className="h-11 w-11 rounded-xl object-cover" />
+              <img src={customLogo ?? logo.url} alt="حُضور" className="h-11 w-11 rounded-xl object-cover" />
               <div className="leading-tight">
                 <div className="text-sm font-extrabold">{academy}</div>
                 <div className="text-xs text-muted-foreground">حُضور</div>
