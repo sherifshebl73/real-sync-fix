@@ -6,13 +6,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { toCSV, downloadFile, parseCSV } from "@/lib/hudoor-types";
 
 export const Route = createFileRoute("/_authenticated/app/settings")({
   component: SettingsPage,
 });
+
 
 function SettingsPage() {
   const nav = useNavigate();
