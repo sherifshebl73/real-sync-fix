@@ -21,8 +21,14 @@ function SettingsPage() {
   const [academy, setAcademy] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [pwd1, setPwd1] = useState("");
+  const [pwd2, setPwd2] = useState("");
+  const [pwdLoading, setPwdLoading] = useState(false);
   const csvRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   const { data } = useQuery({
     queryKey: ["profile"],
@@ -34,9 +40,20 @@ function SettingsPage() {
   });
 
   useEffect(() => {
-    if (data?.profile) setAcademy(data.profile.academy_name);
+    if (data?.profile) {
+      setAcademy(data.profile.academy_name);
+      setLogoPath(data.profile.logo_url);
+    }
     if (data?.user) setEmail(data.user.email ?? "");
   }, [data]);
+
+  // Resolve signed URL for private logo
+  useEffect(() => {
+    if (!logoPath) { setLogoUrl(null); return; }
+    supabase.storage.from("logos").createSignedUrl(logoPath, 60 * 60 * 24 * 365).then(({ data }) => {
+      if (data?.signedUrl) setLogoUrl(data.signedUrl);
+    });
+  }, [logoPath]);
 
   const save = async () => {
     setLoading(true);
@@ -44,15 +61,62 @@ function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("profiles").update({ academy_name: academy }).eq("id", user!.id);
       if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["profile"] });
       toast.success("تم الحفظ");
     } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
     finally { setLoading(false); }
+  };
+
+  const uploadLogo = async (file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("غير مسجل");
+      if (file.size > 2 * 1024 * 1024) throw new Error("حجم الصورة أكبر من 2MB");
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${user.id}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("logos").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      // Remove old
+      if (logoPath) await supabase.storage.from("logos").remove([logoPath]);
+      const { error } = await supabase.from("profiles").update({ logo_url: path }).eq("id", user.id);
+      if (error) throw error;
+      setLogoPath(path);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("تم رفع اللوجو");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+  };
+
+  const removeLogo = async () => {
+    if (!logoPath) return;
+    if (!confirm("حذف اللوجو؟")) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.storage.from("logos").remove([logoPath]);
+      await supabase.from("profiles").update({ logo_url: null }).eq("id", user!.id);
+      setLogoPath(null); setLogoUrl(null);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("تم الحذف");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+  };
+
+  const changePassword = async () => {
+    if (pwd1.length < 6) return toast.error("كلمة المرور 6 أحرف على الأقل");
+    if (pwd1 !== pwd2) return toast.error("كلمتا المرور غير متطابقتين");
+    setPwdLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pwd1 });
+      if (error) throw error;
+      setPwd1(""); setPwd2("");
+      toast.success("تم تغيير كلمة المرور");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ"); }
+    finally { setPwdLoading(false); }
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     nav({ to: "/auth" });
   };
+
 
   // ---------- Export players CSV ----------
   const exportPlayersCSV = async () => {
