@@ -52,7 +52,7 @@ export function AppShell() {
       <header className="sticky top-0 z-40 border-b bg-card/80 backdrop-blur md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <img src={logo.url} alt="حُضور" className="h-9 w-9 rounded-lg object-cover" />
+            <img src={customLogo ?? logo.url} alt="حُضور" className="h-9 w-9 rounded-lg object-cover" />
             <div className="text-sm font-bold">{academy}</div>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setOpen(v => !v)}>
@@ -66,7 +66,7 @@ export function AppShell() {
         <aside className={`${open ? "block" : "hidden"} md:block fixed md:sticky md:top-0 inset-y-0 right-0 z-30 h-screen w-64 shrink-0 border-l bg-card`}>
           <div className="flex h-full flex-col p-4">
             <Link to="/app" className="mb-6 flex items-center gap-3 rounded-xl p-2 hover:bg-muted">
-              <img src={logo.url} alt="حُضور" className="h-11 w-11 rounded-xl object-cover" />
+              <img src={customLogo ?? logo.url} alt="حُضور" className="h-11 w-11 rounded-xl object-cover" />
               <div className="leading-tight">
                 <div className="text-sm font-extrabold">{academy}</div>
                 <div className="text-xs text-muted-foreground">حُضور</div>

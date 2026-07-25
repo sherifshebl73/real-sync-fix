@@ -36,6 +36,7 @@ function Landing() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" asChild><Link to="/pricing">الأسعار</Link></Button>
             {signedIn ? (
               <Button asChild><Link to="/app">افتح لوحة التحكم <ArrowLeft className="ms-2 h-4 w-4" /></Link></Button>
             ) : (
@@ -45,6 +46,7 @@ function Landing() {
               </>
             )}
           </div>
+
         </div>
       </header>
 
@@ -64,12 +66,13 @@ function Landing() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button size="lg" asChild className="gradient-brand text-brand-foreground hover:opacity-90">
-            <Link to="/auth" search={{ mode: "signup" }}>ابدأ مجاناً الآن</Link>
+            <Link to="/auth" search={{ mode: "signup" }}>ابدأ مجاناً — 50 مشترك</Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link to="/auth">لدي حساب</Link>
+            <Link to="/pricing">عرض الأسعار</Link>
           </Button>
         </div>
+
       </section>
 
       {/* Features */}
