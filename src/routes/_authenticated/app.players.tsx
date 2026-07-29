@@ -40,10 +40,10 @@ function PlayersPage() {
     queryFn: async () => (await supabase.from("player_activities").select("*")).data as PlayerActivity[] ?? [],
   });
 
-  const linksByPlayer = new Map<string, string[]>();
+  const linksByPlayer = new Map<string, PlayerActivity[]>();
   allLinks.forEach(l => {
     const arr = linksByPlayer.get(l.player_id) ?? [];
-    arr.push(l.activity_id);
+    arr.push(l);
     linksByPlayer.set(l.player_id, arr);
   });
 
