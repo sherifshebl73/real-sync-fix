@@ -101,6 +101,8 @@ export type Database = {
           created_at: string
           id: string
           player_id: string
+          remaining_sessions: number
+          total_sessions: number
           user_id: string
         }
         Insert: {
@@ -108,6 +110,8 @@ export type Database = {
           created_at?: string
           id?: string
           player_id: string
+          remaining_sessions?: number
+          total_sessions?: number
           user_id: string
         }
         Update: {
@@ -115,6 +119,8 @@ export type Database = {
           created_at?: string
           id?: string
           player_id?: string
+          remaining_sessions?: number
+          total_sessions?: number
           user_id?: string
         }
         Relationships: [
