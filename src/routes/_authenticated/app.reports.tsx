@@ -41,8 +41,9 @@ function GeneralTab() {
   const { data } = useQuery({
     queryKey: ["reports-general"],
     queryFn: async () => {
-      const [all, present, absent, activities] = await Promise.all([
-        supabase.from("players").select("id, total_sessions, remaining_sessions, archived"),
+      const [all, links, present, absent, activities] = await Promise.all([
+        supabase.from("players").select("id, total_sessions, remaining_sessions, archived, activity_id"),
+        supabase.from("player_activities").select("player_id, total_sessions, remaining_sessions"),
         supabase.from("attendance").select("id", { count: "exact", head: true }).eq("present", true),
         supabase.from("attendance").select("id", { count: "exact", head: true }).eq("present", false),
         supabase.from("activities").select("id", { count: "exact", head: true }),
@@ -50,8 +51,17 @@ function GeneralTab() {
       const players = all.data ?? [];
       const active = players.filter(p => !p.archived);
       const archived = players.filter(p => p.archived);
-      const consumed = active.reduce((s, p) => s + (p.total_sessions - p.remaining_sessions), 0);
-      const totalCap = active.reduce((s, p) => s + p.total_sessions, 0);
+      const linkRows = (links.data ?? []) as { player_id: string; total_sessions: number; remaining_sessions: number }[];
+      const linkedIds = new Set(linkRows.map(l => l.player_id));
+
+      // Use per-activity sessions when available; fall back to player row for legacy no-link
+      let totalCap = linkRows.reduce((s, l) => s + l.total_sessions, 0);
+      let totalRem = linkRows.reduce((s, l) => s + l.remaining_sessions, 0);
+      active.filter(p => !linkedIds.has(p.id)).forEach(p => {
+        totalCap += p.total_sessions;
+        totalRem += p.remaining_sessions;
+      });
+      const consumed = totalCap - totalRem;
       return {
         totalPlayers: players.length, active: active.length, archived: archived.length,
         activities: activities.count ?? 0,
