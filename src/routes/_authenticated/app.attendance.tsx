@@ -26,23 +26,44 @@ function AttendancePage() {
     queryFn: async () => (await supabase.from("activities").select("*").order("name")).data as Activity[] ?? [],
   });
 
-  const { data: players = [] } = useQuery({
-    queryKey: ["players-by-activity", activityId],
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["enrollments-by-activity", activityId],
     enabled: !!activityId,
     queryFn: async () => {
-      // Get all player_ids linked to this activity (junction + legacy activity_id column)
-      const [linkRes, legacyRes] = await Promise.all([
-        supabase.from("player_activities").select("player_id").eq("activity_id", activityId),
-        supabase.from("players").select("id").eq("activity_id", activityId).eq("archived", false),
-      ]);
-      const ids = new Set<string>();
-      (linkRes.data as { player_id: string }[] | null)?.forEach(r => ids.add(r.player_id));
-      (legacyRes.data as { id: string }[] | null)?.forEach(r => ids.add(r.id));
-      if (ids.size === 0) return [];
-      const { data } = await supabase.from("players").select("*").in("id", Array.from(ids)).eq("archived", false).order("name");
-      return (data ?? []) as Player[];
+      // Junction rows for this activity (source of truth for per-activity sessions)
+      const { data: links } = await supabase
+        .from("player_activities")
+        .select("id, player_id, activity_id, total_sessions, remaining_sessions")
+        .eq("activity_id", activityId);
+      const linkRows = (links ?? []) as PlayerActivity[];
+
+      // Legacy: players with activity_id = this activity but no junction row
+      const linkedIds = new Set(linkRows.map(r => r.player_id));
+      const { data: legacy } = await supabase
+        .from("players")
+        .select("id, total_sessions, remaining_sessions")
+        .eq("activity_id", activityId)
+        .eq("archived", false);
+      const legacyExtras = (legacy ?? []).filter(p => !linkedIds.has(p.id));
+
+      const allPlayerIds = [...linkedIds, ...legacyExtras.map(p => p.id)];
+      if (allPlayerIds.length === 0) return [] as Array<Player & { link_id: string | null; act_total: number; act_remaining: number }>;
+
+      const { data: playersData } = await supabase
+        .from("players").select("*").in("id", allPlayerIds).eq("archived", false).order("name");
+      const players = (playersData ?? []) as Player[];
+
+      return players.map(p => {
+        const link = linkRows.find(l => l.player_id === p.id);
+        if (link) {
+          return { ...p, link_id: link.id, act_total: link.total_sessions, act_remaining: link.remaining_sessions };
+        }
+        return { ...p, link_id: null, act_total: p.total_sessions, act_remaining: p.remaining_sessions };
+      });
     },
   });
+
+  const players = enrollments;
 
   const { data: existing = [] } = useQuery({
     queryKey: ["att", activityId, date],
@@ -73,23 +94,33 @@ function AttendancePage() {
       const existingMap = new Map(existing.map(r => [r.player_id, r.present]));
       for (const [pid, present] of entries) {
         const wasPresent = existingMap.get(pid);
-        if (present && !wasPresent) {
-          const p = players.find(x => x.id === pid);
-          if (p && p.remaining_sessions > 0) {
-            await supabase.from("players").update({ remaining_sessions: p.remaining_sessions - 1 }).eq("id", pid);
+        const p = players.find(x => x.id === pid);
+        if (!p) continue;
+
+        // Delta only for this specific activity
+        if (present && !wasPresent && p.act_remaining > 0) {
+          if (p.link_id) {
+            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", p.link_id);
+          } else {
+            await supabase.from("players").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", pid);
           }
         } else if (!present && wasPresent) {
-          const p = players.find(x => x.id === pid);
-          if (p) await supabase.from("players").update({ remaining_sessions: p.remaining_sessions + 1 }).eq("id", pid);
+          if (p.link_id) {
+            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", p.link_id);
+          } else {
+            await supabase.from("players").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", pid);
+          }
         }
       }
     },
     onSuccess: () => {
       toast.success("تم حفظ الحضور");
       qc.invalidateQueries({ queryKey: ["players"] });
-      qc.invalidateQueries({ queryKey: ["players-by-activity"] });
+      qc.invalidateQueries({ queryKey: ["enrollments-by-activity"] });
+      qc.invalidateQueries({ queryKey: ["player_activities_all"] });
       qc.invalidateQueries({ queryKey: ["att", activityId, date] });
       qc.invalidateQueries({ queryKey: ["home-stats"] });
+      qc.invalidateQueries({ queryKey: ["alerts"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
