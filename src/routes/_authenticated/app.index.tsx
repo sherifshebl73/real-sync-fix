@@ -14,17 +14,18 @@ function HomePage() {
     queryKey: ["home-stats"],
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
-      const [activities, players, todayAtt, lowPlayers] = await Promise.all([
+      const [activities, players, todayAtt, lowLinks, legacyLow] = await Promise.all([
         supabase.from("activities").select("id", { count: "exact", head: true }),
         supabase.from("players").select("id", { count: "exact", head: true }).eq("archived", false),
         supabase.from("attendance").select("id", { count: "exact", head: true }).eq("attendance_date", today).eq("present", true),
-        supabase.from("players").select("id", { count: "exact", head: true }).eq("archived", false).lte("remaining_sessions", 2),
+        supabase.from("player_activities").select("id", { count: "exact", head: true }).lte("remaining_sessions", 2),
+        supabase.from("players").select("id", { count: "exact", head: true }).eq("archived", false).lte("remaining_sessions", 2).is("activity_id", null),
       ]);
       return {
         activities: activities.count ?? 0,
         players: players.count ?? 0,
         todayAttendance: todayAtt.count ?? 0,
-        lowSessions: lowPlayers.count ?? 0,
+        lowSessions: (lowLinks.count ?? 0) + (legacyLow.count ?? 0),
       };
     },
   });
@@ -40,8 +41,21 @@ function HomePage() {
   const { data: lowPlayers } = useQuery({
     queryKey: ["low-players"],
     queryFn: async () => {
-      const { data } = await supabase.from("players").select("*").eq("archived", false).lte("remaining_sessions", 2).gt("remaining_sessions", 0).order("remaining_sessions").limit(5);
-      return (data ?? []) as Player[];
+      const { data: links } = await supabase
+        .from("player_activities")
+        .select("player_id, activity_id, total_sessions, remaining_sessions")
+        .lte("remaining_sessions", 2).gt("remaining_sessions", 0)
+        .order("remaining_sessions").limit(10);
+      const ids = Array.from(new Set(((links ?? []) as { player_id: string }[]).map(l => l.player_id)));
+      if (ids.length === 0) return [] as (Player & { link_remaining: number; link_total: number })[];
+      const { data: pdata } = await supabase.from("players").select("*").in("id", ids).eq("archived", false);
+      const players = (pdata ?? []) as Player[];
+      const out: (Player & { link_remaining: number; link_total: number })[] = [];
+      players.forEach(p => {
+        const l = (links ?? []).find((x: any) => x.player_id === p.id);
+        if (l) out.push({ ...p, link_remaining: (l as any).remaining_sessions, link_total: (l as any).total_sessions });
+      });
+      return out.slice(0, 5);
     },
   });
 
