@@ -67,8 +67,18 @@ function PlayersPage() {
     mutationFn: async (p: Player) => {
       const { error } = await supabase.from("players").update({ remaining_sessions: p.total_sessions }).eq("id", p.id);
       if (error) throw error;
+      // Reset per-activity remaining to each link's total
+      const links = linksByPlayer.get(p.id) ?? [];
+      for (const l of links) {
+        await supabase.from("player_activities").update({ remaining_sessions: l.total_sessions }).eq("id", l.id);
+      }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["players"] }); toast.success("تم تجديد الاشتراك"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["players"] });
+      qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+      qc.invalidateQueries({ queryKey: ["alerts"] });
+      toast.success("تم تجديد الاشتراك");
+    },
   });
 
   const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || (p.receipt_number ?? "").includes(q));
