@@ -123,18 +123,20 @@ function PlayersPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {filtered.map(p => {
-              const ids = linksByPlayer.get(p.id) ?? (p.activity_id ? [p.activity_id] : []);
-              const names = ids.map(id => activities.find(a => a.id === id)?.name).filter(Boolean) as string[];
-              const pct = p.total_sessions > 0 ? (p.remaining_sessions / p.total_sessions) * 100 : 0;
-              const low = p.remaining_sessions <= 2;
+              const links = linksByPlayer.get(p.id) ?? [];
+              const hasLinks = links.length > 0;
+              const totalCap = hasLinks ? links.reduce((s, l) => s + l.total_sessions, 0) : p.total_sessions;
+              const totalRem = hasLinks ? links.reduce((s, l) => s + l.remaining_sessions, 0) : p.remaining_sessions;
+              const pct = totalCap > 0 ? (totalRem / totalCap) * 100 : 0;
+              const low = links.some(l => l.remaining_sessions <= 2) || (!hasLinks && p.remaining_sessions <= 2);
               return (
                 <Card key={p.id} className="p-4 card-hover">
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-base font-bold">{p.name}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {names.length > 0 ? names.join(" • ") : "بدون نشاط"}
-                        {p.receipt_number ? ` • إيصال #${p.receipt_number}` : ""}
+                        {p.receipt_number ? `إيصال #${p.receipt_number} • ` : ""}
+                        {new Date(p.registration_date).toLocaleDateString("ar-EG")}
                       </div>
                     </div>
                     <div className="flex gap-0.5">
@@ -144,15 +146,41 @@ function PlayersPage() {
                       <Button variant="ghost" size="icon" onClick={() => confirm("حذف نهائي؟") && del.mutate(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className={low ? "font-bold text-warning" : "text-muted-foreground"}>
-                      متبقي {p.remaining_sessions} من {p.total_sessions} حصة
-                    </span>
-                    <span className="text-muted-foreground">{new Date(p.registration_date).toLocaleDateString("ar-EG")}</span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className={`h-full ${low ? "bg-warning" : "bg-brand"}`} style={{ width: `${pct}%` }} />
-                  </div>
+
+                  {hasLinks ? (
+                    <div className="mt-3 space-y-1.5">
+                      {links.map(l => {
+                        const a = activities.find(x => x.id === l.activity_id);
+                        const lp = l.total_sessions > 0 ? (l.remaining_sessions / l.total_sessions) * 100 : 0;
+                        const ll = l.remaining_sessions <= 2;
+                        return (
+                          <div key={l.id} className="rounded-md border p-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold">{a?.name ?? "—"}</span>
+                              <span className={ll ? "font-bold text-warning" : "text-muted-foreground"}>
+                                متبقي {l.remaining_sessions} من {l.total_sessions}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className={`h-full ${ll ? "bg-warning" : "bg-brand"}`} style={{ width: `${lp}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-3 flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">بدون نشاط</span>
+                        <span className={low ? "font-bold text-warning" : "text-muted-foreground"}>
+                          متبقي {totalRem} من {totalCap}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className={`h-full ${low ? "bg-warning" : "bg-brand"}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </>
+                  )}
                 </Card>
               );
             })}
