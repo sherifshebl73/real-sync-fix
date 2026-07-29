@@ -101,7 +101,7 @@ function PlayersPage() {
               activities={activities}
               initialLinks={editing ? (linksByPlayer.get(editing.id) ?? []) : []}
               onDone={() => {
-                setOpen(of => false); setEditing(null);
+                setOpen(false); setEditing(null);
                 qc.invalidateQueries({ queryKey: ["players"] });
                 qc.invalidateQueries({ queryKey: ["player_activities_all"] });
               }}
