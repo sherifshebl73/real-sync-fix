@@ -191,24 +191,35 @@ function PlayersPage() {
   );
 }
 
-function PlayerForm({ editing, activities, initialActivityIds, onDone }: {
+function PlayerForm({ editing, activities, initialLinks, onDone }: {
   editing: Player | null;
   activities: Activity[];
-  initialActivityIds: string[];
+  initialLinks: PlayerActivity[];
   onDone: () => void;
 }) {
+  type Sel = { activity_id: string; total_sessions: number; remaining_sessions: number; existing_link_id: string | null };
+  const seed: Sel[] = initialLinks.length > 0
+    ? initialLinks.map(l => ({ activity_id: l.activity_id, total_sessions: l.total_sessions, remaining_sessions: l.remaining_sessions, existing_link_id: l.id }))
+    : (editing?.activity_id ? [{ activity_id: editing.activity_id, total_sessions: editing.total_sessions, remaining_sessions: editing.remaining_sessions, existing_link_id: null }] : []);
+
   const [name, setName] = useState(editing?.name ?? "");
-  const [activityIds, setActivityIds] = useState<string[]>(initialActivityIds);
+  const [selections, setSelections] = useState<Sel[]>(seed);
   const [regDate, setRegDate] = useState(editing?.registration_date ?? new Date().toISOString().slice(0, 10));
   const [receipt, setReceipt] = useState(editing?.receipt_number ?? "");
-  const [total, setTotal] = useState(editing?.total_sessions ?? 8);
-  const [remaining, setRemaining] = useState(editing?.remaining_sessions ?? 8);
   const [note, setNote] = useState(editing?.note ?? "");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { setActivityIds(initialActivityIds); }, [editing?.id]);
+  useEffect(() => { setSelections(seed); /* eslint-disable-next-line */ }, [editing?.id]);
 
-  const toggle = (id: string) => setActivityIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const isSelected = (id: string) => selections.some(s => s.activity_id === id);
+  const toggle = (id: string) => setSelections(prev =>
+    prev.some(s => s.activity_id === id)
+      ? prev.filter(s => s.activity_id !== id)
+      : [...prev, { activity_id: id, total_sessions: 8, remaining_sessions: 8, existing_link_id: null }]
+  );
+  const updateSel = (id: string, patch: Partial<Sel>) => setSelections(prev =>
+    prev.map(s => s.activity_id === id ? { ...s, ...patch } : s)
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,14 +228,16 @@ function PlayerForm({ editing, activities, initialActivityIds, onDone }: {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("غير مسجل");
-      const primary = activityIds[0] ?? null;
+      const primary = selections[0] ?? null;
+      const totalSum = selections.reduce((s, x) => s + Number(x.total_sessions || 0), 0);
+      const remainingSum = selections.reduce((s, x) => s + Number(x.remaining_sessions || 0), 0);
       const payload = {
         name: name.trim(),
-        activity_id: primary,
+        activity_id: primary?.activity_id ?? null,
         registration_date: regDate,
         receipt_number: receipt || null,
-        total_sessions: Number(total),
-        remaining_sessions: Number(remaining),
+        total_sessions: totalSum || (editing?.total_sessions ?? 8),
+        remaining_sessions: remainingSum || (editing?.remaining_sessions ?? 8),
         note: note || null,
         user_id: user.id,
       };
@@ -240,10 +253,16 @@ function PlayerForm({ editing, activities, initialActivityIds, onDone }: {
         playerId = data!.id;
       }
 
-      // Sync junction
+      // Sync junction with per-activity sessions
       await supabase.from("player_activities").delete().eq("player_id", playerId);
-      if (activityIds.length > 0) {
-        const rows = activityIds.map(aid => ({ user_id: user.id, player_id: playerId, activity_id: aid }));
+      if (selections.length > 0) {
+        const rows = selections.map(s => ({
+          user_id: user.id,
+          player_id: playerId,
+          activity_id: s.activity_id,
+          total_sessions: Number(s.total_sessions) || 8,
+          remaining_sessions: Number(s.remaining_sessions) || 0,
+        }));
         const { error: linkErr } = await supabase.from("player_activities").insert(rows);
         if (linkErr) throw linkErr;
       }
@@ -260,29 +279,54 @@ function PlayerForm({ editing, activities, initialActivityIds, onDone }: {
       <div className="space-y-1.5"><Label>اسم المشترك *</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
 
       <div className="space-y-2">
-        <Label>الأنشطة {activityIds.length > 0 && <span className="text-xs text-muted-foreground">({activityIds.length} مختارة)</span>}</Label>
+        <Label>الأنشطة {selections.length > 0 && <span className="text-xs text-muted-foreground">({selections.length} مختارة)</span>}</Label>
         {activities.length === 0 ? (
           <p className="text-xs text-muted-foreground">لا توجد أنشطة — أضف نشاطاً أولاً.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {activities.map(a => (
               <button type="button" key={a.id} onClick={() => toggle(a.id)}
-                className={`rounded-full px-3 py-1.5 text-sm border transition ${activityIds.includes(a.id) ? "bg-brand text-brand-foreground border-brand" : "bg-card hover:bg-muted"}`}>
+                className={`rounded-full px-3 py-1.5 text-sm border transition ${isSelected(a.id) ? "bg-brand text-brand-foreground border-brand" : "bg-card hover:bg-muted"}`}>
                 {a.name}
               </button>
             ))}
           </div>
         )}
-        <p className="text-[11px] text-muted-foreground">يمكن اختيار أكثر من نشاط.</p>
+        <p className="text-[11px] text-muted-foreground">اختر النشاط ثم حدد عدد الحصص لكل نشاط على حدة.</p>
       </div>
+
+      {selections.length > 0 && (
+        <div className="space-y-2">
+          <Label>عدد الحصص لكل نشاط</Label>
+          <div className="space-y-2">
+            {selections.map(s => {
+              const a = activities.find(x => x.id === s.activity_id);
+              return (
+                <div key={s.activity_id} className="rounded-lg border p-3 space-y-2">
+                  <div className="text-sm font-semibold">{a?.name ?? "—"}</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">إجمالي الحصص</Label>
+                      <Input type="number" min={1} value={s.total_sessions}
+                        onChange={e => {
+                          const v = Number(e.target.value);
+                          updateSel(s.activity_id, { total_sessions: v, ...(editing ? {} : { remaining_sessions: v }) });
+                        }} />
+                    </div>
+                    <div className="space-y-1"><Label className="text-xs">المتبقي</Label>
+                      <Input type="number" min={0} value={s.remaining_sessions}
+                        onChange={e => updateSel(s.activity_id, { remaining_sessions: Number(e.target.value) })} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5"><Label>تاريخ التسجيل</Label><Input type="date" value={regDate} onChange={e => setRegDate(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>رقم الإيصال</Label><Input value={receipt ?? ""} onChange={e => setReceipt(e.target.value)} /></div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5"><Label>عدد الحصص الكلي</Label><Input type="number" min={1} value={total} onChange={e => { setTotal(Number(e.target.value)); if (!editing) setRemaining(Number(e.target.value)); }} /></div>
-        <div className="space-y-1.5"><Label>الحصص المتبقية</Label><Input type="number" min={0} value={remaining} onChange={e => setRemaining(Number(e.target.value))} /></div>
       </div>
       <div className="space-y-1.5"><Label>ملاحظات</Label><Input value={note ?? ""} onChange={e => setNote(e.target.value)} /></div>
       <Button type="submit" className="w-full gradient-brand text-brand-foreground" disabled={loading}>{editing ? "حفظ" : "إضافة"}</Button>
