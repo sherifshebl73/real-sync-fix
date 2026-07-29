@@ -109,7 +109,7 @@ function HomePage() {
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-warning/40 bg-warning/5 p-3">
                   <div>
                     <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">متبقي {p.remaining_sessions} من {p.total_sessions}</div>
+                    <div className="text-xs text-muted-foreground">متبقي {p.link_remaining} من {p.link_total}</div>
                   </div>
                   <TrendingUp className="h-4 w-4 text-warning" />
                 </div>
