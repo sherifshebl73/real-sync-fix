@@ -165,7 +165,7 @@ function AttendancePage() {
                     <div key={p.id} className="flex items-center justify-between px-3 py-3">
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">متبقي {p.remaining_sessions} من {p.total_sessions}</div>
+                        <div className="text-xs text-muted-foreground">متبقي {p.act_remaining} من {p.act_total} (لهذا النشاط)</div>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" variant={val === true ? "default" : "outline"}
