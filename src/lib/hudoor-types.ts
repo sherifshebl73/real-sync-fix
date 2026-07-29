@@ -28,6 +28,8 @@ export type PlayerActivity = {
   user_id: string;
   player_id: string;
   activity_id: string;
+  total_sessions: number;
+  remaining_sessions: number;
   created_at: string;
 };
 
