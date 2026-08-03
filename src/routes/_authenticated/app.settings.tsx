@@ -6,9 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import { toCSV, downloadFile, parseCSV } from "@/lib/hudoor-types";
+import { toCSV, downloadFile } from "@/lib/hudoor-types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { readPlayersFile, buildPreview, applyImport, exportPlayersXLSX, type ImportPreview, type ImportMode } from "@/lib/players-import";
+
 
 export const Route = createFileRoute("/_authenticated/app/settings")({
   component: SettingsPage,
@@ -26,9 +30,14 @@ function SettingsPage() {
   const [pwd1, setPwd1] = useState("");
   const [pwd2, setPwd2] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [mode, setMode] = useState<ImportMode>("merge");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+
 
   const { data } = useQuery({
     queryKey: ["profile"],
@@ -133,41 +142,35 @@ function SettingsPage() {
     toast.success(`تم تصدير ${rows.length} مشترك`);
   };
 
-  // ---------- Import players CSV ----------
-  const importPlayersCSV = async (file: File) => {
+  // ---------- Import players (Excel/CSV) with mode ----------
+  const pickImportFile = async (file: File) => {
     try {
-      const text = await file.text();
-      const rows = parseCSV(text);
-      if (rows.length === 0) throw new Error("الملف فارغ");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("غير مسجل");
-      const { data: activities } = await supabase.from("activities").select("id,name");
-      const actMap = new Map((activities ?? []).map(a => [a.name.trim(), a.id]));
-
-      const toInsert = rows.map(r => {
-        const total = Number(r["الحصص الكلية"] || r.total_sessions || 8);
-        const remaining = r["الحصص المتبقية"] || r.remaining_sessions;
-        const actName = (r["النشاط الأساسي"] || r.activity || "").trim();
-        return {
-          user_id: user.id,
-          name: (r["الاسم"] || r.name || "").trim(),
-          receipt_number: (r["رقم الإيصال"] || r.receipt_number || "").trim() || null,
-          activity_id: actName ? (actMap.get(actName) ?? null) : null,
-          total_sessions: total,
-          remaining_sessions: remaining !== undefined && remaining !== "" ? Number(remaining) : total,
-          registration_date: r["تاريخ التسجيل"] || r.registration_date || new Date().toISOString().slice(0, 10),
-          note: (r["ملاحظات"] || r.note || "").trim() || null,
-          archived: (r["مؤرشف"] || "").trim() === "نعم",
-        };
-      }).filter(p => p.name);
-
-      if (toInsert.length === 0) throw new Error("لا توجد صفوف صالحة (تأكد من عمود 'الاسم')");
-      const { error } = await supabase.from("players").insert(toInsert);
-      if (error) throw error;
-      qc.invalidateQueries();
-      toast.success(`تم استيراد ${toInsert.length} مشترك`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ في الاستيراد"); }
+      const rows = await readPlayersFile(file);
+      if (rows.length === 0) throw new Error("لا توجد صفوف صالحة (تأكد من عمود 'الاسم')");
+      const pv = await buildPreview(rows);
+      setPreview(pv);
+      setMode("merge");
+      setImportOpen(true);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذّر قراءة الملف"); }
   };
+
+  const confirmImport = async () => {
+    if (!preview) return;
+    if (mode === "replace" && !confirm("سيتم حذف كل المشتركين الحاليين وسجلات حضورهم واستبدالهم ببيانات الملف. متأكد؟")) return;
+    setImporting(true);
+    try {
+      const res = await applyImport(preview.rows, mode);
+      qc.invalidateQueries();
+      setImportOpen(false); setPreview(null);
+      toast.success(
+        mode === "replace"
+          ? `تم الاستبدال: ${res.inserted} مشترك (حُذف ${res.deleted})`
+          : `تم التحديث: ${res.updated} معدّل، ${res.inserted} جديد`
+      );
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ في الاستيراد"); }
+    finally { setImporting(false); }
+  };
+
 
   // ---------- Full backup JSON ----------
   const exportBackup = async () => {
@@ -283,16 +286,20 @@ function SettingsPage() {
       <Card className="p-6 space-y-4">
         <div>
           <h2 className="font-bold flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> استيراد وتصدير المشتركين</h2>
-          <p className="text-xs text-muted-foreground mt-1">تصدير قائمة المشتركين إلى ملف Excel/CSV أو استيراد قائمة جاهزة.</p>
+          <p className="text-xs text-muted-foreground mt-1">صدّر الملف، عدّل عليه في Excel، ثم استورده مع اختيار: إضافة التعديلات فقط أو استبدال كامل.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button variant="outline" onClick={exportPlayersCSV}><Download className="ms-1 h-4 w-4" /> تصدير المشتركين (CSV)</Button>
-          <Button variant="outline" onClick={() => csvRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> استيراد من CSV</Button>
-          <input ref={csvRef} type="file" accept=".csv,text/csv" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) importPlayersCSV(f); e.target.value = ""; }} />
+          <Button variant="outline" onClick={async () => { const n = await exportPlayersXLSX(); toast.success(`تم تصدير ${n} مشترك`); }}>
+            <FileSpreadsheet className="ms-1 h-4 w-4" /> تصدير Excel (xlsx)
+          </Button>
+          <Button variant="outline" onClick={() => csvRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> استيراد ملف (Excel / CSV)</Button>
+          <Button variant="outline" onClick={exportPlayersCSV}><Download className="ms-1 h-4 w-4" /> تصدير CSV</Button>
+          <input ref={csvRef} type="file" accept=".xlsx,.xls,.csv,text/csv" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) pickImportFile(f); e.target.value = ""; }} />
         </div>
-        <p className="text-[11px] text-muted-foreground">أعمدة CSV المتوقعة: الاسم، رقم الإيصال، النشاط الأساسي، الحصص الكلية، الحصص المتبقية، تاريخ التسجيل، ملاحظات، مؤرشف.</p>
+        <p className="text-[11px] text-muted-foreground">الأعمدة المتوقعة: الاسم، رقم الإيصال، النشاط الأساسي، الحصص الكلية، الحصص المتبقية، تاريخ التسجيل، ملاحظات، مؤرشف. المطابقة تتم برقم الإيصال وإن لم يوجد فبالاسم.</p>
       </Card>
+
 
       <Card className="p-6 space-y-4">
         <div>
@@ -314,6 +321,49 @@ function SettingsPage() {
           <LogOut className="ms-1 h-4 w-4" /> تسجيل الخروج
         </Button>
       </Card>
+
+      <Dialog open={importOpen} onOpenChange={o => { if (!importing) { setImportOpen(o); if (!o) setPreview(null); } }}>
+        <DialogContent className="max-w-lg" dir="rtl">
+          <DialogHeader><DialogTitle>خيارات الاستيراد</DialogTitle></DialogHeader>
+          {preview && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-3 text-sm space-y-1">
+                <div>صفوف الملف: <b>{preview.rows.length}</b></div>
+                <div>مطابقة لمشتركين حاليين (سيتم تعديلها): <b>{preview.updates}</b></div>
+                <div>جديدة (ستُضاف): <b>{preview.inserts}</b></div>
+                <div>المسجّلون حالياً في النظام: <b>{preview.existingTotal}</b></div>
+                {preview.missingActivities.length > 0 && (
+                  <div className="text-muted-foreground text-xs">سيتم إنشاء أنشطة جديدة: {preview.missingActivities.join("، ")}</div>
+                )}
+              </div>
+
+              <RadioGroup value={mode} onValueChange={v => setMode(v as ImportMode)} className="space-y-2">
+                <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer has-[:checked]:border-brand">
+                  <RadioGroupItem value="merge" className="mt-1" />
+                  <span>
+                    <span className="font-semibold block">إضافة التعديلات فقط (دمج)</span>
+                    <span className="text-xs text-muted-foreground">تحديث بيانات المشتركين المطابقين وإضافة الجدد، مع الاحتفاظ بكل البيانات القديمة وسجلات الحضور.</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer has-[:checked]:border-destructive">
+                  <RadioGroupItem value="replace" className="mt-1" />
+                  <span>
+                    <span className="font-semibold block text-destructive">استبدال كامل</span>
+                    <span className="text-xs text-muted-foreground">حذف جميع المشتركين الحاليين وسجلات حضورهم، ثم إدخال بيانات الملف فقط.</span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importing}>إلغاء</Button>
+            <Button onClick={confirmImport} disabled={importing} className={mode === "replace" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "gradient-brand text-brand-foreground"}>
+              {importing ? "جارٍ التنفيذ..." : mode === "replace" ? "استبدال كامل" : "تطبيق التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
