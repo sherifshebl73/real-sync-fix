@@ -321,6 +321,49 @@ function SettingsPage() {
           <LogOut className="ms-1 h-4 w-4" /> تسجيل الخروج
         </Button>
       </Card>
+
+      <Dialog open={importOpen} onOpenChange={o => { if (!importing) { setImportOpen(o); if (!o) setPreview(null); } }}>
+        <DialogContent className="max-w-lg" dir="rtl">
+          <DialogHeader><DialogTitle>خيارات الاستيراد</DialogTitle></DialogHeader>
+          {preview && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-3 text-sm space-y-1">
+                <div>صفوف الملف: <b>{preview.rows.length}</b></div>
+                <div>مطابقة لمشتركين حاليين (سيتم تعديلها): <b>{preview.updates}</b></div>
+                <div>جديدة (ستُضاف): <b>{preview.inserts}</b></div>
+                <div>المسجّلون حالياً في النظام: <b>{preview.existingTotal}</b></div>
+                {preview.missingActivities.length > 0 && (
+                  <div className="text-muted-foreground text-xs">سيتم إنشاء أنشطة جديدة: {preview.missingActivities.join("، ")}</div>
+                )}
+              </div>
+
+              <RadioGroup value={mode} onValueChange={v => setMode(v as ImportMode)} className="space-y-2">
+                <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer has-[:checked]:border-brand">
+                  <RadioGroupItem value="merge" className="mt-1" />
+                  <span>
+                    <span className="font-semibold block">إضافة التعديلات فقط (دمج)</span>
+                    <span className="text-xs text-muted-foreground">تحديث بيانات المشتركين المطابقين وإضافة الجدد، مع الاحتفاظ بكل البيانات القديمة وسجلات الحضور.</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer has-[:checked]:border-destructive">
+                  <RadioGroupItem value="replace" className="mt-1" />
+                  <span>
+                    <span className="font-semibold block text-destructive">استبدال كامل</span>
+                    <span className="text-xs text-muted-foreground">حذف جميع المشتركين الحاليين وسجلات حضورهم، ثم إدخال بيانات الملف فقط.</span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importing}>إلغاء</Button>
+            <Button onClick={confirmImport} disabled={importing} className={mode === "replace" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "gradient-brand text-brand-foreground"}>
+              {importing ? "جارٍ التنفيذ..." : mode === "replace" ? "استبدال كامل" : "تطبيق التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
