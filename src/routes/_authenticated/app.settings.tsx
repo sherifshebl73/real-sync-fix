@@ -6,9 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import { toCSV, downloadFile, parseCSV } from "@/lib/hudoor-types";
+import { toCSV, downloadFile } from "@/lib/hudoor-types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { readPlayersFile, buildPreview, applyImport, exportPlayersXLSX, type ImportPreview, type ImportMode } from "@/lib/players-import";
+
 
 export const Route = createFileRoute("/_authenticated/app/settings")({
   component: SettingsPage,
