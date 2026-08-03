@@ -286,16 +286,20 @@ function SettingsPage() {
       <Card className="p-6 space-y-4">
         <div>
           <h2 className="font-bold flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> استيراد وتصدير المشتركين</h2>
-          <p className="text-xs text-muted-foreground mt-1">تصدير قائمة المشتركين إلى ملف Excel/CSV أو استيراد قائمة جاهزة.</p>
+          <p className="text-xs text-muted-foreground mt-1">صدّر الملف، عدّل عليه في Excel، ثم استورده مع اختيار: إضافة التعديلات فقط أو استبدال كامل.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button variant="outline" onClick={exportPlayersCSV}><Download className="ms-1 h-4 w-4" /> تصدير المشتركين (CSV)</Button>
-          <Button variant="outline" onClick={() => csvRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> استيراد من CSV</Button>
-          <input ref={csvRef} type="file" accept=".csv,text/csv" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) importPlayersCSV(f); e.target.value = ""; }} />
+          <Button variant="outline" onClick={async () => { const n = await exportPlayersXLSX(); toast.success(`تم تصدير ${n} مشترك`); }}>
+            <FileSpreadsheet className="ms-1 h-4 w-4" /> تصدير Excel (xlsx)
+          </Button>
+          <Button variant="outline" onClick={() => csvRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> استيراد ملف (Excel / CSV)</Button>
+          <Button variant="outline" onClick={exportPlayersCSV}><Download className="ms-1 h-4 w-4" /> تصدير CSV</Button>
+          <input ref={csvRef} type="file" accept=".xlsx,.xls,.csv,text/csv" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) pickImportFile(f); e.target.value = ""; }} />
         </div>
-        <p className="text-[11px] text-muted-foreground">أعمدة CSV المتوقعة: الاسم، رقم الإيصال، النشاط الأساسي، الحصص الكلية، الحصص المتبقية، تاريخ التسجيل، ملاحظات، مؤرشف.</p>
+        <p className="text-[11px] text-muted-foreground">الأعمدة المتوقعة: الاسم، رقم الإيصال، النشاط الأساسي، الحصص الكلية، الحصص المتبقية، تاريخ التسجيل، ملاحظات، مؤرشف. المطابقة تتم برقم الإيصال وإن لم يوجد فبالاسم.</p>
       </Card>
+
 
       <Card className="p-6 space-y-4">
         <div>
