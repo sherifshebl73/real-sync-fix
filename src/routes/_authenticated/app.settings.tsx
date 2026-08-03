@@ -30,9 +30,14 @@ function SettingsPage() {
   const [pwd1, setPwd1] = useState("");
   const [pwd2, setPwd2] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [mode, setMode] = useState<ImportMode>("merge");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+
 
   const { data } = useQuery({
     queryKey: ["profile"],
