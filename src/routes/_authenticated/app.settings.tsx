@@ -133,41 +133,35 @@ function SettingsPage() {
     toast.success(`تم تصدير ${rows.length} مشترك`);
   };
 
-  // ---------- Import players CSV ----------
-  const importPlayersCSV = async (file: File) => {
+  // ---------- Import players (Excel/CSV) with mode ----------
+  const pickImportFile = async (file: File) => {
     try {
-      const text = await file.text();
-      const rows = parseCSV(text);
-      if (rows.length === 0) throw new Error("الملف فارغ");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("غير مسجل");
-      const { data: activities } = await supabase.from("activities").select("id,name");
-      const actMap = new Map((activities ?? []).map(a => [a.name.trim(), a.id]));
-
-      const toInsert = rows.map(r => {
-        const total = Number(r["الحصص الكلية"] || r.total_sessions || 8);
-        const remaining = r["الحصص المتبقية"] || r.remaining_sessions;
-        const actName = (r["النشاط الأساسي"] || r.activity || "").trim();
-        return {
-          user_id: user.id,
-          name: (r["الاسم"] || r.name || "").trim(),
-          receipt_number: (r["رقم الإيصال"] || r.receipt_number || "").trim() || null,
-          activity_id: actName ? (actMap.get(actName) ?? null) : null,
-          total_sessions: total,
-          remaining_sessions: remaining !== undefined && remaining !== "" ? Number(remaining) : total,
-          registration_date: r["تاريخ التسجيل"] || r.registration_date || new Date().toISOString().slice(0, 10),
-          note: (r["ملاحظات"] || r.note || "").trim() || null,
-          archived: (r["مؤرشف"] || "").trim() === "نعم",
-        };
-      }).filter(p => p.name);
-
-      if (toInsert.length === 0) throw new Error("لا توجد صفوف صالحة (تأكد من عمود 'الاسم')");
-      const { error } = await supabase.from("players").insert(toInsert);
-      if (error) throw error;
-      qc.invalidateQueries();
-      toast.success(`تم استيراد ${toInsert.length} مشترك`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ في الاستيراد"); }
+      const rows = await readPlayersFile(file);
+      if (rows.length === 0) throw new Error("لا توجد صفوف صالحة (تأكد من عمود 'الاسم')");
+      const pv = await buildPreview(rows);
+      setPreview(pv);
+      setMode("merge");
+      setImportOpen(true);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذّر قراءة الملف"); }
   };
+
+  const confirmImport = async () => {
+    if (!preview) return;
+    if (mode === "replace" && !confirm("سيتم حذف كل المشتركين الحاليين وسجلات حضورهم واستبدالهم ببيانات الملف. متأكد؟")) return;
+    setImporting(true);
+    try {
+      const res = await applyImport(preview.rows, mode);
+      qc.invalidateQueries();
+      setImportOpen(false); setPreview(null);
+      toast.success(
+        mode === "replace"
+          ? `تم الاستبدال: ${res.inserted} مشترك (حُذف ${res.deleted})`
+          : `تم التحديث: ${res.updated} معدّل، ${res.inserted} جديد`
+      );
+    } catch (e) { toast.error(e instanceof Error ? e.message : "خطأ في الاستيراد"); }
+    finally { setImporting(false); }
+  };
+
 
   // ---------- Full backup JSON ----------
   const exportBackup = async () => {
