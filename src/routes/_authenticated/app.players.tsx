@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, Trash2, Pencil, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Archive as ArchiveIcon, RotateCcw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { Player, Activity, PlayerActivity } from "@/lib/hudoor-types";
 
