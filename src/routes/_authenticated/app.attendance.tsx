@@ -20,6 +20,8 @@ function AttendancePage() {
   const [activityId, setActivityId] = useState<string>("");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [marks, setMarks] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState("");
+
 
   const { data: activities = [] } = useQuery({
     queryKey: ["activities"],
@@ -47,23 +49,50 @@ function AttendancePage() {
       const legacyExtras = (legacy ?? []).filter(p => !linkedIds.has(p.id));
 
       const allPlayerIds = [...linkedIds, ...legacyExtras.map(p => p.id)];
-      if (allPlayerIds.length === 0) return [] as Array<Player & { link_id: string | null; act_total: number; act_remaining: number }>;
+      if (allPlayerIds.length === 0) return [] as Array<Player & { link_id: string | null; act_total: number; act_remaining: number; activity_names: string[] }>;
 
       const { data: playersData } = await supabase
         .from("players").select("*").in("id", allPlayerIds).eq("archived", false).order("name");
       const players = (playersData ?? []) as Player[];
 
+      // كل الأنشطة التي يشترك فيها هؤلاء المشتركون
+      const { data: allLinks } = await supabase
+        .from("player_activities")
+        .select("player_id, activity_id")
+        .in("player_id", allPlayerIds);
+      const { data: acts } = await supabase.from("activities").select("id,name");
+      const actName = new Map((acts ?? []).map(a => [a.id, a.name as string]));
+      const byPlayer = new Map<string, string[]>();
+      for (const l of allLinks ?? []) {
+        const n = actName.get(l.activity_id);
+        if (!n) continue;
+        const arr = byPlayer.get(l.player_id) ?? [];
+        if (!arr.includes(n)) arr.push(n);
+        byPlayer.set(l.player_id, arr);
+      }
+
       return players.map(p => {
         const link = linkRows.find(l => l.player_id === p.id);
-        if (link) {
-          return { ...p, link_id: link.id, act_total: link.total_sessions, act_remaining: link.remaining_sessions };
+        const names = byPlayer.get(p.id) ?? [];
+        if (names.length === 0 && p.activity_id) {
+          const n = actName.get(p.activity_id);
+          if (n) names.push(n);
         }
-        return { ...p, link_id: null, act_total: p.total_sessions, act_remaining: p.remaining_sessions };
+        if (link) {
+          return { ...p, link_id: link.id, act_total: link.total_sessions, act_remaining: link.remaining_sessions, activity_names: names };
+        }
+        return { ...p, link_id: null, act_total: p.total_sessions, act_remaining: p.remaining_sessions, activity_names: names };
       });
     },
   });
 
-  const players = enrollments;
+  const term = search.trim().toLowerCase();
+  const players = term
+    ? enrollments.filter(p =>
+        p.name.toLowerCase().includes(term) ||
+        (p.receipt_number ?? "").toLowerCase().includes(term))
+    : enrollments;
+
 
   const { data: existing = [] } = useQuery({
     queryKey: ["att", activityId, date],
