@@ -191,11 +191,12 @@ function PlayersPage() {
   );
 }
 
-function PlayerForm({ editing, activities, initialLinks, onDone }: {
+function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting }: {
   editing: Player | null;
   activities: Activity[];
   initialLinks: PlayerActivity[];
   onDone: () => void;
+  onPickExisting?: (id: string) => void;
 }) {
   type Sel = { activity_id: string; total_sessions: number; remaining_sessions: number; existing_link_id: string | null };
   const seed: Sel[] = initialLinks.length > 0
@@ -208,6 +209,7 @@ function PlayerForm({ editing, activities, initialLinks, onDone }: {
   const [receipt, setReceipt] = useState(editing?.receipt_number ?? "");
   const [note, setNote] = useState(editing?.note ?? "");
   const [loading, setLoading] = useState(false);
+  const [allowDup, setAllowDup] = useState(false);
 
   useEffect(() => { setSelections(seed); /* eslint-disable-next-line */ }, [editing?.id]);
 
