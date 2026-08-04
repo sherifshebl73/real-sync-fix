@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Save, ClipboardCheck } from "lucide-react";
+import { Check, X, Save, ClipboardCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { Player, Activity, AttendanceRow, PlayerActivity } from "@/lib/hudoor-types";
 
@@ -175,11 +175,22 @@ function AttendancePage() {
           </div>
           <div className="space-y-1.5"><Label>التاريخ</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
         </div>
+        {activityId && (
+          <div className="mt-3 space-y-1.5">
+            <Label>بحث</Label>
+            <div className="relative">
+              <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pe-9" placeholder="ابحث بالاسم أو رقم الإيصال" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          </div>
+        )}
       </Card>
 
       {activityId && (
         players.length === 0 ? (
-          <Card className="p-10 text-center text-muted-foreground">لا يوجد مشتركون في هذا النشاط.</Card>
+          <Card className="p-10 text-center text-muted-foreground">
+            {enrollments.length === 0 ? "لا يوجد مشتركون في هذا النشاط." : "لا توجد نتائج مطابقة للبحث."}
+          </Card>
         ) : (
           <>
             <div className="flex gap-2">
@@ -191,11 +202,22 @@ function AttendancePage() {
                 {players.map(p => {
                   const val = marks[p.id];
                   return (
-                    <div key={p.id} className="flex items-center justify-between px-3 py-3">
+                    <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-3">
                       <div className="min-w-0">
-                        <div className="font-semibold truncate">{p.name}</div>
+                        <div className="font-semibold truncate">
+                          {p.name}
+                          {p.receipt_number ? <span className="ms-2 text-xs font-normal text-muted-foreground">#{p.receipt_number}</span> : null}
+                        </div>
                         <div className="text-xs text-muted-foreground">متبقي {p.act_remaining} من {p.act_total} (لهذا النشاط)</div>
+                        {p.activity_names.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {p.activity_names.map(n => (
+                              <span key={n} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{n}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
+
                       <div className="flex gap-2">
                         <Button size="sm" variant={val === true ? "default" : "outline"}
                           className={val === true ? "bg-success text-white hover:bg-success/90" : ""}
