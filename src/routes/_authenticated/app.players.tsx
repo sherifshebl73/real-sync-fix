@@ -211,6 +211,17 @@ function PlayerForm({ editing, activities, initialLinks, onDone }: {
 
   useEffect(() => { setSelections(seed); /* eslint-disable-next-line */ }, [editing?.id]);
 
+  const { data: allPlayers = [] } = useQuery({
+    queryKey: ["players_all_names"],
+    queryFn: async () => (await supabase.from("players").select("id,name,archived,receipt_number,remaining_sessions,total_sessions")).data ?? [],
+  });
+
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+  const duplicates = name.trim()
+    ? (allPlayers as Array<{ id: string; name: string; archived: boolean; receipt_number: string | null; remaining_sessions: number; total_sessions: number }>)
+        .filter(p => norm(p.name) === norm(name) && p.id !== editing?.id)
+    : [];
+
   const isSelected = (id: string) => selections.some(s => s.activity_id === id);
   const toggle = (id: string) => setSelections(prev =>
     prev.some(s => s.activity_id === id)
