@@ -241,7 +241,7 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
       toast.error("الاسم مكرر — أكّد الإضافة أو افتح المشترك الحالي للتجديد");
       return;
     }
-
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("غير مسجل");
