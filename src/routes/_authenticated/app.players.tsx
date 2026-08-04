@@ -97,13 +97,19 @@ function PlayersPage() {
           <DialogContent dir="rtl">
             <DialogHeader><DialogTitle>{editing ? "تعديل المشترك" : "مشترك جديد"}</DialogTitle></DialogHeader>
             <PlayerForm
+              key={editing?.id ?? "new"}
               editing={editing}
               activities={activities}
               initialLinks={editing ? (linksByPlayer.get(editing.id) ?? []) : []}
+              onPickExisting={(id) => {
+                const p = players.find(x => x.id === id);
+                if (p) setEditing(p);
+              }}
               onDone={() => {
                 setOpen(false); setEditing(null);
                 qc.invalidateQueries({ queryKey: ["players"] });
                 qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+                qc.invalidateQueries({ queryKey: ["players_all_names"] });
               }}
             />
           </DialogContent>
