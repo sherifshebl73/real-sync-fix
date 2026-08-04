@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, Trash2, Pencil, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Archive as ArchiveIcon, RotateCcw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { Player, Activity, PlayerActivity } from "@/lib/hudoor-types";
 
@@ -97,13 +97,19 @@ function PlayersPage() {
           <DialogContent dir="rtl">
             <DialogHeader><DialogTitle>{editing ? "تعديل المشترك" : "مشترك جديد"}</DialogTitle></DialogHeader>
             <PlayerForm
+              key={editing?.id ?? "new"}
               editing={editing}
               activities={activities}
               initialLinks={editing ? (linksByPlayer.get(editing.id) ?? []) : []}
+              onPickExisting={(id) => {
+                const p = players.find(x => x.id === id);
+                if (p) setEditing(p);
+              }}
               onDone={() => {
                 setOpen(false); setEditing(null);
                 qc.invalidateQueries({ queryKey: ["players"] });
                 qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+                qc.invalidateQueries({ queryKey: ["players_all_names"] });
               }}
             />
           </DialogContent>
@@ -191,11 +197,12 @@ function PlayersPage() {
   );
 }
 
-function PlayerForm({ editing, activities, initialLinks, onDone }: {
+function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting }: {
   editing: Player | null;
   activities: Activity[];
   initialLinks: PlayerActivity[];
   onDone: () => void;
+  onPickExisting?: (id: string) => void;
 }) {
   type Sel = { activity_id: string; total_sessions: number; remaining_sessions: number; existing_link_id: string | null };
   const seed: Sel[] = initialLinks.length > 0
@@ -208,8 +215,20 @@ function PlayerForm({ editing, activities, initialLinks, onDone }: {
   const [receipt, setReceipt] = useState(editing?.receipt_number ?? "");
   const [note, setNote] = useState(editing?.note ?? "");
   const [loading, setLoading] = useState(false);
+  const [allowDup, setAllowDup] = useState(false);
 
   useEffect(() => { setSelections(seed); /* eslint-disable-next-line */ }, [editing?.id]);
+
+  const { data: allPlayers = [] } = useQuery({
+    queryKey: ["players_all_names"],
+    queryFn: async () => (await supabase.from("players").select("id,name,archived,receipt_number,remaining_sessions,total_sessions")).data ?? [],
+  });
+
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+  const duplicates = name.trim()
+    ? (allPlayers as Array<{ id: string; name: string; archived: boolean; receipt_number: string | null; remaining_sessions: number; total_sessions: number }>)
+        .filter(p => norm(p.name) === norm(name) && p.id !== editing?.id)
+    : [];
 
   const isSelected = (id: string) => selections.some(s => s.activity_id === id);
   const toggle = (id: string) => setSelections(prev =>
@@ -224,6 +243,10 @@ function PlayerForm({ editing, activities, initialLinks, onDone }: {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (duplicates.length > 0 && !allowDup) {
+      toast.error("الاسم مكرر — أكّد الإضافة أو افتح المشترك الحالي للتجديد");
+      return;
+    }
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -276,7 +299,35 @@ function PlayerForm({ editing, activities, initialLinks, onDone }: {
 
   return (
     <form onSubmit={submit} className="space-y-4 max-h-[70vh] overflow-y-auto pe-1">
-      <div className="space-y-1.5"><Label>اسم المشترك *</Label><Input value={name} onChange={e => setName(e.target.value)} required /></div>
+      <div className="space-y-1.5">
+        <Label>اسم المشترك *</Label>
+        <Input value={name} onChange={e => { setName(e.target.value); setAllowDup(false); }} required />
+        {duplicates.length > 0 && (
+          <div className="rounded-lg border border-warning/50 bg-warning/10 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-sm font-bold text-warning">
+              <AlertTriangle className="h-4 w-4" /> هذا الاسم مسجّل بالفعل
+            </div>
+            {duplicates.map(d => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card p-2 text-xs">
+                <span>
+                  {d.name}{d.receipt_number ? ` • إيصال #${d.receipt_number}` : ""} • متبقي {d.remaining_sessions} من {d.total_sessions}
+                  {d.archived ? " • (مؤرشف)" : ""}
+                </span>
+                {onPickExisting && !d.archived && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => onPickExisting(d.id)}>
+                    فتح للتجديد / التعديل
+                  </Button>
+                )}
+              </div>
+            ))}
+            <label className="flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={allowDup} onChange={e => setAllowDup(e.target.checked)} />
+              أنا متأكد، أضِف مشتركاً جديداً بنفس الاسم
+            </label>
+          </div>
+        )}
+      </div>
+
 
       <div className="space-y-2">
         <Label>الأنشطة {selections.length > 0 && <span className="text-xs text-muted-foreground">({selections.length} مختارة)</span>}</Label>
