@@ -237,7 +237,11 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    setLoading(true);
+    if (duplicates.length > 0 && !allowDup) {
+      toast.error("الاسم مكرر — أكّد الإضافة أو افتح المشترك الحالي للتجديد");
+      return;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("غير مسجل");
