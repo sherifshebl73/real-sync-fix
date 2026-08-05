@@ -154,8 +154,68 @@ function AttendancePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const toggle = (id: string, val: boolean) => setMarks(prev => ({ ...prev, [id]: val }));
-  const markAll = (val: boolean) => setMarks(Object.fromEntries(players.map(p => [p.id, val])));
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const persistOne = async (pid: string, present: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("غير مسجل");
+    const { error } = await supabase.from("attendance").upsert(
+      [{ user_id: user.id, player_id: pid, activity_id: activityId, attendance_date: date, present }],
+      { onConflict: "player_id,attendance_date" },
+    );
+    if (error) throw error;
+
+    const wasPresent = existing.find(r => r.player_id === pid)?.present;
+    const p = players.find(x => x.id === pid);
+    if (!p || wasPresent === present) return;
+
+    if (present && !wasPresent && p.act_remaining > 0) {
+      if (p.link_id) await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", p.link_id);
+      else await supabase.from("players").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", pid);
+    } else if (!present && wasPresent) {
+      if (p.link_id) await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", p.link_id);
+      else await supabase.from("players").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", pid);
+    }
+  };
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["players"] });
+    qc.invalidateQueries({ queryKey: ["enrollments-by-activity"] });
+    qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+    qc.invalidateQueries({ queryKey: ["att", activityId, date] });
+    qc.invalidateQueries({ queryKey: ["home-stats"] });
+    qc.invalidateQueries({ queryKey: ["alerts"] });
+  };
+
+  const toggle = async (id: string, val: boolean) => {
+    if (marks[id] === val) return;
+    const prevVal = marks[id];
+    setMarks(prev => ({ ...prev, [id]: val }));
+    setSavingId(id);
+    try {
+      await persistOne(id, val);
+      toast.success(val ? "تم تسجيل الحضور" : "تم تسجيل الغياب");
+      refreshAll();
+    } catch (e) {
+      setMarks(prev => ({ ...prev, [id]: prevVal as boolean }));
+      toast.error((e as Error).message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const markAll = async (val: boolean) => {
+    const targets = players.filter(p => marks[p.id] !== val);
+    if (targets.length === 0) return;
+    setMarks(prev => ({ ...prev, ...Object.fromEntries(targets.map(p => [p.id, val])) }));
+    try {
+      for (const p of targets) await persistOne(p.id, val);
+      toast.success("تم الحفظ");
+      refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   return (
     <div className="space-y-5">
