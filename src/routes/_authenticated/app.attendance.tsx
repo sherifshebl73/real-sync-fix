@@ -235,7 +235,7 @@ function AttendancePage() {
                       <div className="flex gap-2">
                         <Button size="sm" variant={val === true ? "default" : "outline"}
                           className={val === true ? "bg-success text-white hover:bg-success/90" : ""}
-                          onClick={() => toggle(p.id, true)}>
+                          disabled={savingId === p.id} onClick={() => toggle(p.id, true)}>
                           <Check className="h-4 w-4" /> حاضر
                         </Button>
                         <Button size="sm" variant={val === false ? "default" : "outline"}
