@@ -107,52 +107,6 @@ function AttendancePage() {
     },
   });
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("غير مسجل");
-      const entries = Object.entries(marks);
-      if (entries.length === 0) throw new Error("لم تقم بتحديد أي حضور");
-
-      const rows = entries.map(([player_id, present]) => ({
-        user_id: user.id, player_id, activity_id: activityId, attendance_date: date, present,
-      }));
-      const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "player_id,attendance_date" });
-      if (error) throw error;
-
-      const existingMap = new Map(existing.map(r => [r.player_id, r.present]));
-      for (const [pid, present] of entries) {
-        const wasPresent = existingMap.get(pid);
-        const p = players.find(x => x.id === pid);
-        if (!p) continue;
-
-        // Delta only for this specific activity
-        if (present && !wasPresent && p.act_remaining > 0) {
-          if (p.link_id) {
-            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", p.link_id);
-          } else {
-            await supabase.from("players").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", pid);
-          }
-        } else if (!present && wasPresent) {
-          if (p.link_id) {
-            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", p.link_id);
-          } else {
-            await supabase.from("players").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", pid);
-          }
-        }
-      }
-    },
-    onSuccess: () => {
-      toast.success("تم حفظ الحضور");
-      qc.invalidateQueries({ queryKey: ["players"] });
-      qc.invalidateQueries({ queryKey: ["enrollments-by-activity"] });
-      qc.invalidateQueries({ queryKey: ["player_activities_all"] });
-      qc.invalidateQueries({ queryKey: ["att", activityId, date] });
-      qc.invalidateQueries({ queryKey: ["home-stats"] });
-      qc.invalidateQueries({ queryKey: ["alerts"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const [savingId, setSavingId] = useState<string | null>(null);
 
