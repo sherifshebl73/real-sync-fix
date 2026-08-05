@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Save, ClipboardCheck, Search } from "lucide-react";
+import { Check, X, ClipboardCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { Player, Activity, AttendanceRow, PlayerActivity } from "@/lib/hudoor-types";
 
@@ -107,55 +107,69 @@ function AttendancePage() {
     },
   });
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("غير مسجل");
-      const entries = Object.entries(marks);
-      if (entries.length === 0) throw new Error("لم تقم بتحديد أي حضور");
 
-      const rows = entries.map(([player_id, present]) => ({
-        user_id: user.id, player_id, activity_id: activityId, attendance_date: date, present,
-      }));
-      const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "player_id,attendance_date" });
-      if (error) throw error;
+  const [savingId, setSavingId] = useState<string | null>(null);
 
-      const existingMap = new Map(existing.map(r => [r.player_id, r.present]));
-      for (const [pid, present] of entries) {
-        const wasPresent = existingMap.get(pid);
-        const p = players.find(x => x.id === pid);
-        if (!p) continue;
+  const persistOne = async (pid: string, present: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("غير مسجل");
+    const { error } = await supabase.from("attendance").upsert(
+      [{ user_id: user.id, player_id: pid, activity_id: activityId, attendance_date: date, present }],
+      { onConflict: "player_id,attendance_date" },
+    );
+    if (error) throw error;
 
-        // Delta only for this specific activity
-        if (present && !wasPresent && p.act_remaining > 0) {
-          if (p.link_id) {
-            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", p.link_id);
-          } else {
-            await supabase.from("players").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", pid);
-          }
-        } else if (!present && wasPresent) {
-          if (p.link_id) {
-            await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", p.link_id);
-          } else {
-            await supabase.from("players").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", pid);
-          }
-        }
-      }
-    },
-    onSuccess: () => {
-      toast.success("تم حفظ الحضور");
-      qc.invalidateQueries({ queryKey: ["players"] });
-      qc.invalidateQueries({ queryKey: ["enrollments-by-activity"] });
-      qc.invalidateQueries({ queryKey: ["player_activities_all"] });
-      qc.invalidateQueries({ queryKey: ["att", activityId, date] });
-      qc.invalidateQueries({ queryKey: ["home-stats"] });
-      qc.invalidateQueries({ queryKey: ["alerts"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+    const wasPresent = existing.find(r => r.player_id === pid)?.present;
+    const p = players.find(x => x.id === pid);
+    if (!p || wasPresent === present) return;
 
-  const toggle = (id: string, val: boolean) => setMarks(prev => ({ ...prev, [id]: val }));
-  const markAll = (val: boolean) => setMarks(Object.fromEntries(players.map(p => [p.id, val])));
+    if (present && !wasPresent && p.act_remaining > 0) {
+      if (p.link_id) await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", p.link_id);
+      else await supabase.from("players").update({ remaining_sessions: p.act_remaining - 1 }).eq("id", pid);
+    } else if (!present && wasPresent) {
+      if (p.link_id) await supabase.from("player_activities").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", p.link_id);
+      else await supabase.from("players").update({ remaining_sessions: p.act_remaining + 1 }).eq("id", pid);
+    }
+  };
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["players"] });
+    qc.invalidateQueries({ queryKey: ["enrollments-by-activity"] });
+    qc.invalidateQueries({ queryKey: ["player_activities_all"] });
+    qc.invalidateQueries({ queryKey: ["att", activityId, date] });
+    qc.invalidateQueries({ queryKey: ["home-stats"] });
+    qc.invalidateQueries({ queryKey: ["alerts"] });
+  };
+
+  const toggle = async (id: string, val: boolean) => {
+    if (marks[id] === val) return;
+    const prevVal = marks[id];
+    setMarks(prev => ({ ...prev, [id]: val }));
+    setSavingId(id);
+    try {
+      await persistOne(id, val);
+      toast.success(val ? "تم تسجيل الحضور" : "تم تسجيل الغياب");
+      refreshAll();
+    } catch (e) {
+      setMarks(prev => ({ ...prev, [id]: prevVal as boolean }));
+      toast.error((e as Error).message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const markAll = async (val: boolean) => {
+    const targets = players.filter(p => marks[p.id] !== val);
+    if (targets.length === 0) return;
+    setMarks(prev => ({ ...prev, ...Object.fromEntries(targets.map(p => [p.id, val])) }));
+    try {
+      for (const p of targets) await persistOne(p.id, val);
+      toast.success("تم الحفظ");
+      refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -221,7 +235,7 @@ function AttendancePage() {
                       <div className="flex gap-2">
                         <Button size="sm" variant={val === true ? "default" : "outline"}
                           className={val === true ? "bg-success text-white hover:bg-success/90" : ""}
-                          onClick={() => toggle(p.id, true)}>
+                          disabled={savingId === p.id} onClick={() => toggle(p.id, true)}>
                           <Check className="h-4 w-4" /> حاضر
                         </Button>
                         <Button size="sm" variant={val === false ? "default" : "outline"}
@@ -235,9 +249,7 @@ function AttendancePage() {
                 })}
               </div>
             </Card>
-            <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full gradient-brand text-brand-foreground">
-              <Save className="ms-1 h-4 w-4" /> {save.isPending ? "جاري الحفظ…" : "حفظ الحضور"}
-            </Button>
+            <p className="text-center text-xs text-muted-foreground">يتم الحفظ تلقائياً عند الضغط على حاضر أو غائب</p>
           </>
         )
       )}
