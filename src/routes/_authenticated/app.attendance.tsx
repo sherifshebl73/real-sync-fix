@@ -295,9 +295,7 @@ function AttendancePage() {
                 })}
               </div>
             </Card>
-            <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full gradient-brand text-brand-foreground">
-              <Save className="ms-1 h-4 w-4" /> {save.isPending ? "جاري الحفظ…" : "حفظ الحضور"}
-            </Button>
+            <p className="text-center text-xs text-muted-foreground">يتم الحفظ تلقائياً عند الضغط على حاضر أو غائب</p>
           </>
         )
       )}
