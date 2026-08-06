@@ -298,7 +298,7 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4 max-h-[70vh] overflow-y-auto pe-1">
+    <form onSubmit={submit} className="flex max-h-[70vh] flex-col"><div className="flex-1 space-y-4 overflow-y-auto pe-1 pb-2">
       <div className="space-y-1.5">
         <Label>اسم المشترك *</Label>
         <Input value={name} onChange={e => { setName(e.target.value); setAllowDup(false); }} required />
@@ -380,7 +380,10 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
         <div className="space-y-1.5"><Label>رقم الإيصال</Label><Input value={receipt ?? ""} onChange={e => setReceipt(e.target.value)} /></div>
       </div>
       <div className="space-y-1.5"><Label>ملاحظات</Label><Input value={note ?? ""} onChange={e => setNote(e.target.value)} /></div>
-      <Button type="submit" className="w-full gradient-brand text-brand-foreground" disabled={loading}>{editing ? "حفظ" : "إضافة"}</Button>
+      </div>
+      <div className="sticky bottom-0 mt-2 border-t bg-background pt-3">
+        <Button type="submit" className="w-full gradient-brand text-brand-foreground" disabled={loading}>{editing ? "حفظ" : "إضافة"}</Button>
+      </div>
     </form>
   );
 }
