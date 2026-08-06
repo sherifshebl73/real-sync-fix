@@ -284,16 +284,67 @@ function AttendancePage() {
           </div>
           <div className="space-y-1.5"><Label>التاريخ</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
         </div>
-        {activityId && (
-          <div className="mt-3 space-y-1.5">
-            <Label>بحث</Label>
-            <div className="relative">
-              <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pe-9" placeholder="ابحث بالاسم أو رقم الإيصال" value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
+        <div className="mt-3 space-y-1.5">
+          <Label>بحث</Label>
+          <div className="relative">
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pe-9" placeholder="ابحث بالاسم أو رقم الإيصال" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-        )}
+          {activityId ? (
+            <button type="button" className="text-xs text-brand underline" onClick={() => setActivityId("")}>
+              بحث في كل الأنشطة (بدون تحديد نشاط)
+            </button>
+          ) : (
+            <p className="text-xs text-muted-foreground">اكتب اسم المشترك أو رقم الإيصال لعرض كل أنشطته وتسجيل الحضور فيها مباشرة.</p>
+          )}
+        </div>
       </Card>
+
+      {!activityId && term.length >= 2 && (
+        globalResults.length === 0 ? (
+          <Card className="p-10 text-center text-muted-foreground">لا توجد نتائج مطابقة للبحث.</Card>
+        ) : (
+          <Card className="p-2">
+            <div className="divide-y">
+              {globalResults.map(({ player: p, entries, marks: gm }) => (
+                <div key={p.id} className="px-3 py-3 space-y-2">
+                  <div className="font-semibold">
+                    {p.name}
+                    {p.receipt_number ? <span className="ms-2 text-xs font-normal text-muted-foreground">#{p.receipt_number}</span> : null}
+                  </div>
+                  {entries.length === 0 && <div className="text-xs text-muted-foreground">غير مسجّل في أي نشاط.</div>}
+                  {entries.map(en => {
+                    const val = gm[en.activity_id];
+                    const key = `${p.id}:${en.activity_id}`;
+                    return (
+                      <div key={en.activity_id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{en.activity_name}</div>
+                          <div className="text-xs text-muted-foreground">متبقي {en.remaining} من {en.total}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant={val === true ? "default" : "outline"}
+                            className={val === true ? "bg-success text-white hover:bg-success/90" : ""}
+                            disabled={savingKey === key}
+                            onClick={() => toggleGlobal(p, en, true, val)}>
+                            <Check className="h-4 w-4" /> حاضر
+                          </Button>
+                          <Button size="sm" variant={val === false ? "default" : "outline"}
+                            className={val === false ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                            disabled={savingKey === key}
+                            onClick={() => toggleGlobal(p, en, false, val)}>
+                            <X className="h-4 w-4" /> غائب
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      )}
 
       {activityId && (
         players.length === 0 ? (
