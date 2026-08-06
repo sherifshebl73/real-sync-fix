@@ -108,6 +108,101 @@ function AttendancePage() {
   });
 
 
+  // ===== بحث عام (بدون اختيار نشاط) =====
+  const globalTerm = !activityId ? term : "";
+  const { data: globalResults = [], refetch: refetchGlobal } = useQuery({
+    queryKey: ["global-attendance-search", globalTerm, date],
+    enabled: globalTerm.length >= 2 && !!date,
+    queryFn: async () => {
+      const { data: playersData } = await supabase
+        .from("players")
+        .select("*")
+        .eq("archived", false)
+        .or(`name.ilike.%${globalTerm}%,receipt_number.ilike.%${globalTerm}%`)
+        .order("name")
+        .limit(30);
+      const found = (playersData ?? []) as Player[];
+      if (found.length === 0) return [];
+      const ids = found.map(p => p.id);
+
+      const { data: links } = await supabase
+        .from("player_activities")
+        .select("id, player_id, activity_id, total_sessions, remaining_sessions")
+        .in("player_id", ids);
+      const { data: acts } = await supabase.from("activities").select("id,name");
+      const actName = new Map((acts ?? []).map(a => [a.id, a.name as string]));
+
+      const { data: attRows } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("attendance_date", date)
+        .in("player_id", ids);
+      const att = (attRows ?? []) as AttendanceRow[];
+
+      return found.map(p => {
+        const rows = ((links ?? []) as PlayerActivity[]).filter(l => l.player_id === p.id);
+        let entries = rows.map(l => ({
+          link_id: l.id as string | null,
+          activity_id: l.activity_id,
+          activity_name: actName.get(l.activity_id) ?? "نشاط",
+          total: l.total_sessions,
+          remaining: l.remaining_sessions,
+        }));
+        if (entries.length === 0 && p.activity_id) {
+          entries = [{
+            link_id: null,
+            activity_id: p.activity_id,
+            activity_name: actName.get(p.activity_id) ?? "نشاط",
+            total: p.total_sessions,
+            remaining: p.remaining_sessions,
+          }];
+        }
+        const marks: Record<string, boolean> = {};
+        att.filter(a => a.player_id === p.id).forEach(a => {
+          if (a.activity_id) marks[a.activity_id] = a.present;
+        });
+        return { player: p, entries, marks };
+      });
+    },
+  });
+
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const toggleGlobal = async (
+    p: Player,
+    entry: { link_id: string | null; activity_id: string; remaining: number },
+    present: boolean,
+    wasPresent: boolean | undefined,
+  ) => {
+    if (wasPresent === present) return;
+    const key = `${p.id}:${entry.activity_id}`;
+    setSavingKey(key);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("غير مسجل");
+      const { error } = await supabase.from("attendance").upsert(
+        [{ user_id: user.id, player_id: p.id, activity_id: entry.activity_id, attendance_date: date, present }],
+        { onConflict: "player_id,attendance_date" },
+      );
+      if (error) throw error;
+
+      if (present && !wasPresent && entry.remaining > 0) {
+        if (entry.link_id) await supabase.from("player_activities").update({ remaining_sessions: entry.remaining - 1 }).eq("id", entry.link_id);
+        else await supabase.from("players").update({ remaining_sessions: entry.remaining - 1 }).eq("id", p.id);
+      } else if (!present && wasPresent) {
+        if (entry.link_id) await supabase.from("player_activities").update({ remaining_sessions: entry.remaining + 1 }).eq("id", entry.link_id);
+        else await supabase.from("players").update({ remaining_sessions: entry.remaining + 1 }).eq("id", p.id);
+      }
+      toast.success(present ? "تم تسجيل الحضور" : "تم تسجيل الغياب");
+      await refetchGlobal();
+      refreshAll();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const persistOne = async (pid: string, present: boolean) => {
