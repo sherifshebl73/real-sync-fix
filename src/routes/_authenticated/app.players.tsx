@@ -94,7 +94,7 @@ function PlayersPage() {
           <DialogTrigger asChild>
             <Button className="gradient-brand text-brand-foreground"><Plus className="ms-1 h-4 w-4" /> مشترك جديد</Button>
           </DialogTrigger>
-          <DialogContent dir="rtl">
+          <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
             <DialogHeader><DialogTitle>{editing ? "تعديل المشترك" : "مشترك جديد"}</DialogTitle></DialogHeader>
             <PlayerForm
               key={editing?.id ?? "new"}
@@ -298,7 +298,7 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
   };
 
   return (
-    <form onSubmit={submit} className="flex max-h-[70vh] flex-col"><div className="flex-1 space-y-4 overflow-y-auto pe-1 pb-2">
+    <form onSubmit={submit} className="space-y-4"><div className="space-y-4">
       <div className="space-y-1.5">
         <Label>اسم المشترك *</Label>
         <Input value={name} onChange={e => { setName(e.target.value); setAllowDup(false); }} required />
@@ -349,7 +349,7 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
       {selections.length > 0 && (
         <div className="space-y-2">
           <Label>عدد الحصص لكل نشاط</Label>
-          <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {selections.map(s => {
               const a = activities.find(x => x.id === s.activity_id);
               return (
@@ -375,13 +375,13 @@ function PlayerForm({ editing, activities, initialLinks, onDone, onPickExisting 
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5"><Label>تاريخ التسجيل</Label><Input type="date" value={regDate} onChange={e => setRegDate(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>رقم الإيصال</Label><Input value={receipt ?? ""} onChange={e => setReceipt(e.target.value)} /></div>
+        <div className="space-y-1.5"><Label>ملاحظات</Label><Input value={note ?? ""} onChange={e => setNote(e.target.value)} /></div>
       </div>
-      <div className="space-y-1.5"><Label>ملاحظات</Label><Input value={note ?? ""} onChange={e => setNote(e.target.value)} /></div>
       </div>
-      <div className="sticky bottom-0 mt-2 border-t bg-background pt-3">
+      <div className="border-t pt-3">
         <Button type="submit" className="w-full gradient-brand text-brand-foreground" disabled={loading}>{editing ? "حفظ" : "إضافة"}</Button>
       </div>
     </form>
