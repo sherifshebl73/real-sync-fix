@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const searchSchema = z.object({ mode: z.enum(["signin", "signup"]).optional() });
 
@@ -31,6 +31,16 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [academy, setAcademy] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+
+  const sendReset = async () => {
+    if (!email) return toast.error("اكتب بريدك الإلكتروني أولاً");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) return toast.error(error.message);
+    toast.success("أرسلنا رابط استعادة كلمة المرور إلى بريدك");
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
