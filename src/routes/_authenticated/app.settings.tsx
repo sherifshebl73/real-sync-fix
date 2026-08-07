@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2, FileSpreadsheet } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Save, Download, Upload, Database, ImageIcon, KeyRound, Trash2, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { toCSV, downloadFile } from "@/lib/hudoor-types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -289,11 +290,20 @@ function SettingsPage() {
           <p className="text-xs text-muted-foreground mt-1">صدّر الملف، عدّل عليه في Excel، ثم استورده مع اختيار: إضافة التعديلات فقط أو استبدال كامل.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button variant="outline" onClick={async () => { const n = await exportPlayersXLSX(); toast.success(`تم تصدير ${n} مشترك`); }}>
-            <FileSpreadsheet className="ms-1 h-4 w-4" /> تصدير Excel (xlsx)
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full"><Download className="ms-1 h-4 w-4" /> تصدير <ChevronDown className="ms-1 h-4 w-4 opacity-60" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={async () => { const n = await exportPlayersXLSX(); toast.success(`تم تصدير ${n} مشترك`); }}>
+                <FileSpreadsheet className="ms-2 h-4 w-4" /> ملف Excel (xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPlayersCSV}>
+                <Download className="ms-2 h-4 w-4" /> ملف CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={() => csvRef.current?.click()}><Upload className="ms-1 h-4 w-4" /> استيراد ملف (Excel / CSV)</Button>
-          <Button variant="outline" onClick={exportPlayersCSV}><Download className="ms-1 h-4 w-4" /> تصدير CSV</Button>
           <input ref={csvRef} type="file" accept=".xlsx,.xls,.csv,text/csv" className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) pickImportFile(f); e.target.value = ""; }} />
         </div>

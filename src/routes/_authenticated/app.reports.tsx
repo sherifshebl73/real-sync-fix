@@ -24,15 +24,108 @@ function ReportsPage() {
       </div>
 
       <Tabs defaultValue="general">
-        <TabsList className="w-full grid grid-cols-3">
+        <TabsList className="w-full grid grid-cols-4">
           <TabsTrigger value="general">عام</TabsTrigger>
+          <TabsTrigger value="day">حضور يوم</TabsTrigger>
           <TabsTrigger value="player">حسب المشترك</TabsTrigger>
           <TabsTrigger value="activity">حسب النشاط</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4"><GeneralTab /></TabsContent>
+        <TabsContent value="day" className="mt-4"><DayTab /></TabsContent>
         <TabsContent value="player" className="mt-4"><PlayerTab /></TabsContent>
         <TabsContent value="activity" className="mt-4"><ActivityTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function DayTab() {
+  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [activityId, setActivityId] = useState("all");
+
+  const { data: activities = [] } = useQuery({
+    queryKey: ["activities"],
+    queryFn: async () => (await supabase.from("activities").select("*").order("name")).data as Activity[] ?? [],
+  });
+  const { data: players = [] } = useQuery({
+    queryKey: ["players-all"],
+    queryFn: async () => (await supabase.from("players").select("*")).data as Player[] ?? [],
+  });
+  const { data: rows = [] } = useQuery({
+    queryKey: ["day-attendance", day, activityId],
+    enabled: !!day,
+    queryFn: async () => {
+      let q = supabase.from("attendance").select("*").eq("attendance_date", day);
+      if (activityId !== "all") q = q.eq("activity_id", activityId);
+      return (await q).data as AttendanceRow[] ?? [];
+    },
+  });
+
+  const nameOfActivity = (aid: string | null) => activities.find(a => a.id === aid)?.name ?? "—";
+  const list = useMemo(() => rows.map(r => ({
+    row: r, player: players.find(p => p.id === r.player_id),
+  })).filter(x => x.player).sort((a, b) => a.player!.name.localeCompare(b.player!.name, "ar")), [rows, players]);
+
+  const present = rows.filter(r => r.present).length;
+  const absent = rows.filter(r => !r.present).length;
+  const rate = rows.length ? Math.round((present / rows.length) * 100) : 0;
+
+  const exportCSV = () => {
+    const data = list.map(x => ({
+      التاريخ: x.row.attendance_date, المشترك: x.player!.name,
+      "رقم الإيصال": x.player!.receipt_number ?? "",
+      النشاط: nameOfActivity(x.row.activity_id), الحالة: x.row.present ? "حاضر" : "غائب",
+    }));
+    downloadFile(`تقرير-حضور-${day}.csv`, toCSV(data));
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5"><Label>اليوم</Label><Input type="date" value={day} onChange={e => setDay(e.target.value)} /></div>
+        <div className="space-y-1.5">
+          <Label>النشاط</Label>
+          <Select value={activityId} onValueChange={setActivityId}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الأنشطة</SelectItem>
+              {activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat icon={Users} label="عدد السجلات" value={rows.length} />
+        <Stat icon={CheckCircle2} label="حاضر" value={present} color="success" />
+        <Stat icon={XCircle} label="غائب" value={absent} color="destructive" />
+        <Stat icon={BarChart3} label="نسبة الحضور" value={`${rate}%`} color="brand" />
+      </div>
+
+      <div className="flex justify-end"><Button variant="outline" onClick={exportCSV} disabled={list.length === 0}><Download className="ms-1 h-4 w-4" /> تصدير CSV</Button></div>
+
+      <Card className="p-0 overflow-hidden">
+        {list.length === 0 ? <div className="p-10 text-center text-muted-foreground">لا توجد سجلات حضور في هذا اليوم.</div> : (
+          <div className="max-h-[500px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 sticky top-0"><tr>
+                <th className="p-3 text-start">المشترك</th><th className="p-3 text-start">رقم الإيصال</th>
+                <th className="p-3 text-start">النشاط</th><th className="p-3 text-start">الحالة</th>
+              </tr></thead>
+              <tbody>
+                {list.map(x => (
+                  <tr key={x.row.id} className="border-t">
+                    <td className="p-3 font-semibold">{x.player!.name}</td>
+                    <td className="p-3 text-muted-foreground">{x.player!.receipt_number ?? "—"}</td>
+                    <td className="p-3">{nameOfActivity(x.row.activity_id)}</td>
+                    <td className="p-3"><span className={x.row.present ? "text-success font-semibold" : "text-destructive font-semibold"}>{x.row.present ? "حاضر" : "غائب"}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

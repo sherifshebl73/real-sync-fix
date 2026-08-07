@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const searchSchema = z.object({ mode: z.enum(["signin", "signup"]).optional() });
 
@@ -31,6 +31,16 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [academy, setAcademy] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+
+  const sendReset = async () => {
+    if (!email) return toast.error("اكتب بريدك الإلكتروني أولاً");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) return toast.error(error.message);
+    toast.success("أرسلنا رابط استعادة كلمة المرور إلى بريدك");
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -101,8 +111,22 @@ function AuthPage() {
               <Input id="email" type="email" required dir="ltr" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">كلمة المرور</Label>
-              <Input id="password" type="password" required minLength={6} dir="ltr" value={password} onChange={e => setPassword(e.target.value)} placeholder="6 أحرف على الأقل" />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">كلمة المرور</Label>
+                {tab === "signin" && (
+                  <button type="button" onClick={sendReset} className="text-xs font-semibold text-brand hover:underline">
+                    نسيت كلمة المرور؟
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Input id="password" type={showPwd ? "text" : "password"} required minLength={6} dir="ltr" className="pe-10"
+                  value={password} onChange={e => setPassword(e.target.value)} placeholder="6 أحرف على الأقل" />
+                <button type="button" onClick={() => setShowPwd(v => !v)} aria-label={showPwd ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  className="absolute inset-y-0 end-2 flex items-center text-muted-foreground hover:text-foreground">
+                  {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full gradient-brand text-brand-foreground" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (tab === "signup" ? "إنشاء الحساب" : "دخول")}
