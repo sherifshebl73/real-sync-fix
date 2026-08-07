@@ -120,10 +120,10 @@ function AuthPage() {
                 )}
               </div>
               <div className="relative">
-                <Input id="password" type={showPwd ? "text" : "password"} required minLength={6} dir="ltr" className="pe-10"
+                <Input id="password" type={showPwd ? "text" : "password"} required minLength={6} dir="ltr" className="ps-10"
                   value={password} onChange={e => setPassword(e.target.value)} placeholder="6 أحرف على الأقل" />
                 <button type="button" onClick={() => setShowPwd(v => !v)} aria-label={showPwd ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                  className="absolute inset-y-0 end-2 flex items-center text-muted-foreground hover:text-foreground">
+                  className="absolute inset-y-0 start-2 flex items-center text-muted-foreground hover:text-foreground">
                   {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>

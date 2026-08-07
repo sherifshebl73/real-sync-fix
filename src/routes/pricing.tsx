@@ -53,10 +53,10 @@ const PLANS: Plan[] = [
     name: "ستارتر",
     tagline: "للأكاديميات الصغيرة النامية",
     cap: "حتى 100 مشترك",
-    monthly: 1,
+    monthly: 1.5,
     yearly: 10,
     yearlyMonthlyEq: 0.83,
-    save: "وفّر 17%",
+    save: "وفّر 44%",
     features: [
       "كل ميزات الخطة المجانية",
       "دعم عبر البريد",
