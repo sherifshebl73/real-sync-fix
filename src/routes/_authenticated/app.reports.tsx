@@ -24,16 +24,18 @@ function ReportsPage() {
       </div>
 
       <Tabs defaultValue="general">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="general">عام</TabsTrigger>
           <TabsTrigger value="day">حضور يوم</TabsTrigger>
           <TabsTrigger value="player">حسب المشترك</TabsTrigger>
           <TabsTrigger value="activity">حسب النشاط</TabsTrigger>
+          <TabsTrigger value="subs">مشتركو نشاط</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4"><GeneralTab /></TabsContent>
         <TabsContent value="day" className="mt-4"><DayTab /></TabsContent>
         <TabsContent value="player" className="mt-4"><PlayerTab /></TabsContent>
         <TabsContent value="activity" className="mt-4"><ActivityTab /></TabsContent>
+        <TabsContent value="subs" className="mt-4"><SubscribersTab /></TabsContent>
       </Tabs>
     </div>
   );
