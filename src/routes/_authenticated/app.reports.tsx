@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BarChart3, Users, CalendarDays, CheckCircle2, XCircle, Download } from "lucide-react";
-import { toCSV, downloadFile, type Player, type Activity, type AttendanceRow } from "@/lib/hudoor-types";
+import { toCSV, downloadFile, type Player, type Activity, type AttendanceRow, type PlayerActivity } from "@/lib/hudoor-types";
 
 export const Route = createFileRoute("/_authenticated/app/reports")({
   component: ReportsPage,
@@ -419,5 +419,124 @@ function Stat({ icon: Icon, label, value, sub, color = "brand" }: any) {
       <div className="text-xs text-muted-foreground">{label}</div>
       {sub && <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div>}
     </Card>
+  );
+}
+
+function SubscribersTab() {
+  const [activityId, setActivityId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(false);
+
+  const { data: activities = [] } = useQuery({
+    queryKey: ["activities"],
+    queryFn: async () => (await supabase.from("activities").select("*").order("name")).data as Activity[] ?? [],
+  });
+  const { data: players = [] } = useQuery({
+    queryKey: ["players-all"],
+    queryFn: async () => (await supabase.from("players").select("*")).data as Player[] ?? [],
+  });
+  const { data: links = [] } = useQuery({
+    queryKey: ["player-activities-all"],
+    queryFn: async () => (await supabase.from("player_activities").select("*")).data as PlayerActivity[] ?? [],
+  });
+
+  const activity = activities.find(a => a.id === activityId);
+
+  const list = useMemo(() => {
+    if (!activityId) return [];
+    const linked = links.filter(l => l.activity_id === activityId);
+    const rows = linked.map(l => ({ link: l, player: players.find(p => p.id === l.player_id) }))
+      .filter(x => !!x.player) as { link: PlayerActivity; player: Player }[];
+    // legacy players linked only via players.activity_id
+    const linkedIds = new Set(linked.map(l => l.player_id));
+    players.filter(p => p.activity_id === activityId && !linkedIds.has(p.id)).forEach(p => {
+      rows.push({ link: { id: p.id, user_id: p.user_id, player_id: p.id, activity_id: activityId, total_sessions: p.total_sessions, remaining_sessions: p.remaining_sessions, created_at: p.created_at }, player: p });
+    });
+    return rows
+      .filter(x => includeArchived || !x.player.archived)
+      .filter(x => {
+        const d = x.player.registration_date;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      })
+      .sort((a, b) => b.player.registration_date.localeCompare(a.player.registration_date));
+  }, [activityId, links, players, from, to, includeArchived]);
+
+  const totalCap = list.reduce((s, x) => s + x.link.total_sessions, 0);
+  const totalRem = list.reduce((s, x) => s + x.link.remaining_sessions, 0);
+  const finished = list.filter(x => x.link.remaining_sessions <= 0).length;
+
+  const exportCSV = () => {
+    if (!activity) return;
+    const data = list.map(x => ({
+      المشترك: x.player.name,
+      "رقم الإيصال": x.player.receipt_number ?? "",
+      "تاريخ التسجيل": x.player.registration_date,
+      "إجمالي الحصص": x.link.total_sessions,
+      "الحصص المتبقية": x.link.remaining_sessions,
+      الحالة: x.player.archived ? "مؤرشف" : (x.link.remaining_sessions <= 0 ? "منتهي" : "نشط"),
+    }));
+    downloadFile(`مشتركو-${activity.name}.csv`, toCSV(data));
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4 space-y-3">
+        <div className="space-y-1.5">
+          <Label>النشاط</Label>
+          <Select value={activityId} onValueChange={setActivityId}>
+            <SelectTrigger><SelectValue placeholder="اختر النشاط" /></SelectTrigger>
+            <SelectContent>{activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-current" checked={includeArchived} onChange={e => setIncludeArchived(e.target.checked)} />
+          تضمين المؤرشفين
+        </label>
+        <p className="text-xs text-muted-foreground">الفلترة حسب تاريخ التسجيل للمشترك.</p>
+      </Card>
+
+      {activityId && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Stat icon={Users} label="عدد المشتركين" value={list.length} />
+            <Stat icon={CalendarDays} label="إجمالي الحصص" value={totalCap} />
+            <Stat icon={CheckCircle2} label="حصص متبقية" value={totalRem} color="success" />
+            <Stat icon={XCircle} label="انتهت حصصهم" value={finished} color="destructive" />
+          </div>
+          <div className="flex justify-end"><Button variant="outline" onClick={exportCSV} disabled={list.length === 0}><Download className="ms-1 h-4 w-4" /> تصدير CSV</Button></div>
+          <Card className="p-0 overflow-hidden">
+            {list.length === 0 ? <div className="p-10 text-center text-muted-foreground">لا يوجد مشتركون في هذه الفترة.</div> : (
+              <div className="max-h-[500px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 sticky top-0"><tr>
+                    <th className="p-3 text-start">المشترك</th><th className="p-3 text-start">رقم الإيصال</th>
+                    <th className="p-3 text-start">تاريخ التسجيل</th><th className="p-3 text-start">الحصص</th><th className="p-3 text-start">الحالة</th>
+                  </tr></thead>
+                  <tbody>
+                    {list.map(x => (
+                      <tr key={x.link.id} className="border-t">
+                        <td className="p-3 font-semibold">{x.player.name}</td>
+                        <td className="p-3 text-muted-foreground">{x.player.receipt_number ?? "—"}</td>
+                        <td className="p-3">{new Date(x.player.registration_date).toLocaleDateString("ar-EG")}</td>
+                        <td className="p-3">{x.link.remaining_sessions} / {x.link.total_sessions}</td>
+                        <td className="p-3">
+                          <span className={x.player.archived ? "text-muted-foreground font-semibold" : x.link.remaining_sessions <= 0 ? "text-destructive font-semibold" : "text-success font-semibold"}>
+                            {x.player.archived ? "مؤرشف" : x.link.remaining_sessions <= 0 ? "منتهي" : "نشط"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+    </div>
   );
 }
