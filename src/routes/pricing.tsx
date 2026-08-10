@@ -157,7 +157,17 @@ function Pricing() {
                 </div>
                 <div className="mb-2 text-sm font-medium text-brand">{p.cap}</div>
                 <div className="mb-4">
-                  {p.monthly === 0 ? (
+                  {p.yearlyOnly ? (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold">${p.yearly}</span>
+                        <span className="text-sm text-muted-foreground">/ سنة</span>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <span className="text-brand font-bold">اشتراك سنوي فقط</span> — أقل من دولار شهرياً
+                      </div>
+                    </>
+                  ) : p.monthly === 0 ? (
                     <div className="text-4xl font-extrabold">مجاناً</div>
                   ) : (
                     <>
