@@ -22,12 +22,12 @@ type Plan = {
   name: string;
   tagline: string;
   cap: string;
-  monthly: number;
+  monthly: number | null;
   yearly: number;
-  yearlyMonthlyEq: number;
-  save: string;
   featured?: boolean;
   yearlyOnly?: boolean;
+  note?: string;
+  cta: string;
   features: string[];
 };
 
@@ -39,67 +39,72 @@ const PLANS: Plan[] = [
     cap: "حتى 50 مشترك",
     monthly: 0,
     yearly: 0,
-    yearlyMonthlyEq: 0,
-    save: "",
+    cta: "ابدأ مجانًا",
     features: [
+      "حتى 50 مشترك",
       "كل الميزات الأساسية",
-      "أنشطة غير محدودة",
-      "تسجيل حضور يومي",
-      "تنبيهات نفاد الحصص",
-      "نسخة احتياطية وتصدير CSV",
+      "إنشاء أنشطة غير محدودة",
+      "تسجيل الحضور اليومي",
+      "تسجيل وخصم الحصص",
+      "نسخ احتياطي وتصدير CSV",
+      "مزامنة سحابية (Cloud Sync)",
     ],
   },
   {
     key: "starter",
     name: "ستارتر",
-    tagline: "للأكاديميات الصغيرة النامية",
+    tagline: "للأكاديميات الصغيرة والناشئة",
     cap: "حتى 100 مشترك",
-    monthly: 0,
-    yearly: 10,
-    yearlyMonthlyEq: 0.83,
-    save: "اشتراك سنوي فقط",
+    monthly: null,
+    yearly: 29,
     yearlyOnly: true,
+    note: "الدفع السنوي فقط",
+    cta: "اشترك سنويًا",
     features: [
+      "حتى 100 مشترك",
       "كل ميزات الخطة المجانية",
-      "دعم عبر البريد",
-      "تقارير تفصيلية بالفترة",
+      "تنبيهات التجديد",
+      "تقارير تفصيلية",
       "استيراد وتصدير Excel/CSV",
+      "دعم عبر البريد",
     ],
   },
   {
     key: "pro",
     name: "برو",
-    tagline: "الأكثر شعبية للأكاديميات المتوسطة",
+    tagline: "للأكاديميات المتوسطة والأكثر نموًا",
     cap: "حتى 500 مشترك",
-    monthly: 5,
-    yearly: 48,
-    yearlyMonthlyEq: 4,
-    save: "وفّر 20%",
+    monthly: 5.99,
+    yearly: 59,
     featured: true,
+    cta: "اختر برو",
     features: [
+      "حتى 500 مشترك",
       "كل ميزات ستارتر",
-      "أولوية في الدعم",
-      "أنشطة ومدربين متعددين",
-      "تخصيص لوجو الأكاديمية",
+      "أنشطة ومدربون متعددون",
+      "تقارير متقدمة",
+      "تخصيص أوسع للأكاديمية",
+      "دعم ذو أولوية",
     ],
   },
   {
     key: "unlimited",
     name: "غير محدود",
-    tagline: "للمنشآت الكبرى والسلاسل",
+    tagline: "للأكاديميات الكبيرة والسلاسل",
     cap: "عدد مشتركين غير محدود",
-    monthly: 20,
-    yearly: 180,
-    yearlyMonthlyEq: 15,
-    save: "وفّر 25%",
+    monthly: 14.99,
+    yearly: 149,
+    cta: "اختر غير محدود",
     features: [
+      "عدد مشتركين غير محدود",
       "كل ميزات برو",
-      "بدون حد أقصى للمشتركين",
-      "دعم فني ذو أولوية قصوى",
+      "دعم ذو أولوية قصوى",
       "نسخ احتياطي تلقائي",
+      "أولوية في الميزات والتحديثات المستقبلية",
     ],
   },
 ];
+
 
 function Pricing() {
   const [yearly, setYearly] = useState(true);
