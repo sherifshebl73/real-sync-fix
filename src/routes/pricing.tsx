@@ -27,6 +27,7 @@ type Plan = {
   yearlyMonthlyEq: number;
   save: string;
   featured?: boolean;
+  yearlyOnly?: boolean;
   features: string[];
 };
 
@@ -53,15 +54,16 @@ const PLANS: Plan[] = [
     name: "ستارتر",
     tagline: "للأكاديميات الصغيرة النامية",
     cap: "حتى 100 مشترك",
-    monthly: 1.5,
+    monthly: 0,
     yearly: 10,
     yearlyMonthlyEq: 0.83,
-    save: "وفّر 44%",
+    save: "اشتراك سنوي فقط",
+    yearlyOnly: true,
     features: [
       "كل ميزات الخطة المجانية",
       "دعم عبر البريد",
       "تقارير تفصيلية بالفترة",
-      "استيراد بيانات جماعي",
+      "استيراد وتصدير Excel/CSV",
     ],
   },
   {
@@ -155,7 +157,17 @@ function Pricing() {
                 </div>
                 <div className="mb-2 text-sm font-medium text-brand">{p.cap}</div>
                 <div className="mb-4">
-                  {p.monthly === 0 ? (
+                  {p.yearlyOnly ? (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold">${p.yearly}</span>
+                        <span className="text-sm text-muted-foreground">/ سنة</span>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <span className="text-brand font-bold">اشتراك سنوي فقط</span> — أقل من دولار شهرياً
+                      </div>
+                    </>
+                  ) : p.monthly === 0 ? (
                     <div className="text-4xl font-extrabold">مجاناً</div>
                   ) : (
                     <>
@@ -181,7 +193,7 @@ function Pricing() {
                 </ul>
                 <Button asChild className={`mt-6 w-full ${p.featured ? "gradient-brand text-brand-foreground" : ""}`} variant={p.featured ? "default" : "outline"}>
                   <Link to="/auth" search={{ mode: "signup" }}>
-                    {p.monthly === 0 ? "ابدأ مجاناً" : "اختر هذه الخطة"}
+                    {p.key === "free" ? "ابدأ مجاناً" : "اختر هذه الخطة"}
                   </Link>
                 </Button>
               </Card>
