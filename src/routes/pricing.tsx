@@ -27,6 +27,7 @@ type Plan = {
   yearlyMonthlyEq: number;
   save: string;
   featured?: boolean;
+  yearlyOnly?: boolean;
   features: string[];
 };
 
@@ -53,15 +54,16 @@ const PLANS: Plan[] = [
     name: "ستارتر",
     tagline: "للأكاديميات الصغيرة النامية",
     cap: "حتى 100 مشترك",
-    monthly: 1.5,
+    monthly: 0,
     yearly: 10,
     yearlyMonthlyEq: 0.83,
-    save: "وفّر 44%",
+    save: "اشتراك سنوي فقط",
+    yearlyOnly: true,
     features: [
       "كل ميزات الخطة المجانية",
       "دعم عبر البريد",
       "تقارير تفصيلية بالفترة",
-      "استيراد بيانات جماعي",
+      "استيراد وتصدير Excel/CSV",
     ],
   },
   {
