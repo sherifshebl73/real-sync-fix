@@ -140,7 +140,7 @@ function Pricing() {
           </button>
           <button onClick={() => setYearly(true)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${yearly ? "bg-brand text-brand-foreground" : "text-muted-foreground"}`}>
-            سنوي <span className="text-[10px]">(وفّر حتى 25%)</span>
+            سنوي <span className="text-[10px]">(وفّر عند الدفع السنوي)</span>
           </button>
         </div>
       </section>
@@ -148,12 +148,14 @@ function Pricing() {
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map(p => {
-            const price = yearly ? p.yearlyMonthlyEq : p.monthly;
+            const savePct = p.monthly && p.monthly > 0
+              ? Math.round((1 - p.yearly / (p.monthly * 12)) * 100)
+              : 0;
             return (
               <Card key={p.key} className={`relative p-6 flex flex-col ${p.featured ? "border-brand border-2 shadow-lg" : ""}`}>
                 {p.featured && (
                   <span className="absolute -top-3 right-1/2 translate-x-1/2 rounded-full bg-brand px-3 py-1 text-xs font-bold text-brand-foreground">
-                    الأكثر اختياراً
+                    الأكثر اختيارًا
                   </span>
                 )}
                 <div className="mb-3">
@@ -169,22 +171,30 @@ function Pricing() {
                         <span className="text-sm text-muted-foreground">/ سنة</span>
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        <span className="text-brand font-bold">اشتراك سنوي فقط</span> — أقل من دولار شهرياً
+                        <span className="text-brand font-bold">{p.note}</span>
                       </div>
                     </>
-                  ) : p.monthly === 0 ? (
-                    <div className="text-4xl font-extrabold">مجاناً</div>
+                  ) : p.yearly === 0 ? (
+                    <div className="text-4xl font-extrabold">مجانًا</div>
+                  ) : yearly ? (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold">${p.yearly}</span>
+                        <span className="text-sm text-muted-foreground">/ سنة</span>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        بدلاً من ${(p.monthly! * 12).toFixed(2)} — <span className="text-brand font-bold">وفّر {savePct}%</span>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-extrabold">${price % 1 === 0 ? price : price.toFixed(2)}</span>
+                        <span className="text-4xl font-extrabold">${p.monthly!.toFixed(2)}</span>
                         <span className="text-sm text-muted-foreground">/ شهر</span>
                       </div>
-                      {yearly && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          يُدفع سنوياً ${p.yearly} — <span className="text-brand font-bold">{p.save}</span>
-                        </div>
-                      )}
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        أو ${p.yearly} سنويًا — <span className="text-brand font-bold">وفّر {savePct}%</span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -198,7 +208,7 @@ function Pricing() {
                 </ul>
                 <Button asChild className={`mt-6 w-full ${p.featured ? "gradient-brand text-brand-foreground" : ""}`} variant={p.featured ? "default" : "outline"}>
                   <Link to="/auth" search={{ mode: "signup" }}>
-                    {p.key === "free" ? "ابدأ مجاناً" : "اختر هذه الخطة"}
+                    {p.yearlyOnly || (yearly && p.yearly > 0) ? (p.key === "starter" ? p.cta : "اشترك سنويًا") : p.cta}
                   </Link>
                 </Button>
               </Card>
