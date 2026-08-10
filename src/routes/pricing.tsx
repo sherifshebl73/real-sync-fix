@@ -22,12 +22,12 @@ type Plan = {
   name: string;
   tagline: string;
   cap: string;
-  monthly: number;
+  monthly: number | null;
   yearly: number;
-  yearlyMonthlyEq: number;
-  save: string;
   featured?: boolean;
   yearlyOnly?: boolean;
+  note?: string;
+  cta: string;
   features: string[];
 };
 
@@ -39,67 +39,72 @@ const PLANS: Plan[] = [
     cap: "حتى 50 مشترك",
     monthly: 0,
     yearly: 0,
-    yearlyMonthlyEq: 0,
-    save: "",
+    cta: "ابدأ مجانًا",
     features: [
+      "حتى 50 مشترك",
       "كل الميزات الأساسية",
-      "أنشطة غير محدودة",
-      "تسجيل حضور يومي",
-      "تنبيهات نفاد الحصص",
-      "نسخة احتياطية وتصدير CSV",
+      "إنشاء أنشطة غير محدودة",
+      "تسجيل الحضور اليومي",
+      "تسجيل وخصم الحصص",
+      "نسخ احتياطي وتصدير CSV",
+      "مزامنة سحابية (Cloud Sync)",
     ],
   },
   {
     key: "starter",
     name: "ستارتر",
-    tagline: "للأكاديميات الصغيرة النامية",
+    tagline: "للأكاديميات الصغيرة والناشئة",
     cap: "حتى 100 مشترك",
-    monthly: 0,
-    yearly: 10,
-    yearlyMonthlyEq: 0.83,
-    save: "اشتراك سنوي فقط",
+    monthly: null,
+    yearly: 29,
     yearlyOnly: true,
+    note: "الدفع السنوي فقط",
+    cta: "اشترك سنويًا",
     features: [
+      "حتى 100 مشترك",
       "كل ميزات الخطة المجانية",
-      "دعم عبر البريد",
-      "تقارير تفصيلية بالفترة",
+      "تنبيهات التجديد",
+      "تقارير تفصيلية",
       "استيراد وتصدير Excel/CSV",
+      "دعم عبر البريد",
     ],
   },
   {
     key: "pro",
     name: "برو",
-    tagline: "الأكثر شعبية للأكاديميات المتوسطة",
+    tagline: "للأكاديميات المتوسطة والأكثر نموًا",
     cap: "حتى 500 مشترك",
-    monthly: 5,
-    yearly: 48,
-    yearlyMonthlyEq: 4,
-    save: "وفّر 20%",
+    monthly: 5.99,
+    yearly: 59,
     featured: true,
+    cta: "اختر برو",
     features: [
+      "حتى 500 مشترك",
       "كل ميزات ستارتر",
-      "أولوية في الدعم",
-      "أنشطة ومدربين متعددين",
-      "تخصيص لوجو الأكاديمية",
+      "أنشطة ومدربون متعددون",
+      "تقارير متقدمة",
+      "تخصيص أوسع للأكاديمية",
+      "دعم ذو أولوية",
     ],
   },
   {
     key: "unlimited",
     name: "غير محدود",
-    tagline: "للمنشآت الكبرى والسلاسل",
+    tagline: "للأكاديميات الكبيرة والسلاسل",
     cap: "عدد مشتركين غير محدود",
-    monthly: 20,
-    yearly: 180,
-    yearlyMonthlyEq: 15,
-    save: "وفّر 25%",
+    monthly: 14.99,
+    yearly: 149,
+    cta: "اختر غير محدود",
     features: [
+      "عدد مشتركين غير محدود",
       "كل ميزات برو",
-      "بدون حد أقصى للمشتركين",
-      "دعم فني ذو أولوية قصوى",
+      "دعم ذو أولوية قصوى",
       "نسخ احتياطي تلقائي",
+      "أولوية في الميزات والتحديثات المستقبلية",
     ],
   },
 ];
+
 
 function Pricing() {
   const [yearly, setYearly] = useState(true);
@@ -135,7 +140,7 @@ function Pricing() {
           </button>
           <button onClick={() => setYearly(true)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${yearly ? "bg-brand text-brand-foreground" : "text-muted-foreground"}`}>
-            سنوي <span className="text-[10px]">(وفّر حتى 25%)</span>
+            سنوي <span className="text-[10px]">(وفّر عند الدفع السنوي)</span>
           </button>
         </div>
       </section>
@@ -143,12 +148,14 @@ function Pricing() {
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map(p => {
-            const price = yearly ? p.yearlyMonthlyEq : p.monthly;
+            const savePct = p.monthly && p.monthly > 0
+              ? Math.round((1 - p.yearly / (p.monthly * 12)) * 100)
+              : 0;
             return (
               <Card key={p.key} className={`relative p-6 flex flex-col ${p.featured ? "border-brand border-2 shadow-lg" : ""}`}>
                 {p.featured && (
                   <span className="absolute -top-3 right-1/2 translate-x-1/2 rounded-full bg-brand px-3 py-1 text-xs font-bold text-brand-foreground">
-                    الأكثر اختياراً
+                    الأكثر اختيارًا
                   </span>
                 )}
                 <div className="mb-3">
@@ -164,22 +171,30 @@ function Pricing() {
                         <span className="text-sm text-muted-foreground">/ سنة</span>
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        <span className="text-brand font-bold">اشتراك سنوي فقط</span> — أقل من دولار شهرياً
+                        <span className="text-brand font-bold">{p.note}</span>
                       </div>
                     </>
-                  ) : p.monthly === 0 ? (
-                    <div className="text-4xl font-extrabold">مجاناً</div>
+                  ) : p.yearly === 0 ? (
+                    <div className="text-4xl font-extrabold">مجانًا</div>
+                  ) : yearly ? (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-extrabold">${p.yearly}</span>
+                        <span className="text-sm text-muted-foreground">/ سنة</span>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        بدلاً من ${(p.monthly! * 12).toFixed(2)} — <span className="text-brand font-bold">وفّر {savePct}%</span>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-extrabold">${price % 1 === 0 ? price : price.toFixed(2)}</span>
+                        <span className="text-4xl font-extrabold">${p.monthly!.toFixed(2)}</span>
                         <span className="text-sm text-muted-foreground">/ شهر</span>
                       </div>
-                      {yearly && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          يُدفع سنوياً ${p.yearly} — <span className="text-brand font-bold">{p.save}</span>
-                        </div>
-                      )}
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        أو ${p.yearly} سنويًا — <span className="text-brand font-bold">وفّر {savePct}%</span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -193,7 +208,7 @@ function Pricing() {
                 </ul>
                 <Button asChild className={`mt-6 w-full ${p.featured ? "gradient-brand text-brand-foreground" : ""}`} variant={p.featured ? "default" : "outline"}>
                   <Link to="/auth" search={{ mode: "signup" }}>
-                    {p.key === "free" ? "ابدأ مجاناً" : "اختر هذه الخطة"}
+                    {p.yearlyOnly || (yearly && p.yearly > 0) ? (p.key === "starter" ? p.cta : "اشترك سنويًا") : p.cta}
                   </Link>
                 </Button>
               </Card>
