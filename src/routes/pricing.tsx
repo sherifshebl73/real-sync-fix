@@ -193,7 +193,7 @@ function Pricing() {
                 </ul>
                 <Button asChild className={`mt-6 w-full ${p.featured ? "gradient-brand text-brand-foreground" : ""}`} variant={p.featured ? "default" : "outline"}>
                   <Link to="/auth" search={{ mode: "signup" }}>
-                    {p.monthly === 0 ? "ابدأ مجاناً" : "اختر هذه الخطة"}
+                    {p.key === "free" ? "ابدأ مجاناً" : "اختر هذه الخطة"}
                   </Link>
                 </Button>
               </Card>
