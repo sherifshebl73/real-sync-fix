@@ -47,7 +47,7 @@ export function AppShell() {
     exact ? loc.pathname === to : loc.pathname === to || loc.pathname.startsWith(to + "/");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background app-canvas">
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-40 border-b bg-card/80 backdrop-blur md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
@@ -63,7 +63,7 @@ export function AppShell() {
 
       <div className="mx-auto flex max-w-7xl">
         {/* Sidebar */}
-        <aside className={`${open ? "block" : "hidden"} md:block fixed md:sticky md:top-0 inset-y-0 right-0 z-30 h-screen w-64 shrink-0 border-l bg-card`}>
+        <aside className={`${open ? "block" : "hidden"} md:block fixed md:sticky md:top-0 inset-y-0 right-0 z-30 h-screen w-64 shrink-0 border-l bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/70`}>
           <div className="flex h-full flex-col p-4">
             <Link to="/app" className="mb-6 flex items-center gap-3 rounded-xl p-2 hover:bg-muted">
               <img src={customLogo ?? logo.url} alt="حُضور" className="h-11 w-11 rounded-xl object-cover" />
