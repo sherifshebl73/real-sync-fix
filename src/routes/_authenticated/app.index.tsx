@@ -125,16 +125,22 @@ function HomePage() {
 }
 
 function StatCard({ icon: Icon, label, value, color, to }: any) {
-  const colorMap: Record<string, string> = {
-    brand: "bg-brand-soft text-brand",
-    navy: "bg-secondary text-navy",
-    success: "bg-success/10 text-success",
-    warning: "bg-warning/10 text-warning",
+  const iconMap: Record<string, string> = {
+    brand: "bg-brand/12 text-brand",
+    navy: "bg-lilac/12 text-lilac",
+    success: "bg-success/12 text-success",
+    warning: "bg-warning/15 text-warning",
+  };
+  const tintMap: Record<string, string> = {
+    brand: "var(--brand)",
+    navy: "var(--lilac)",
+    success: "var(--success)",
+    warning: "var(--warning)",
   };
   return (
     <Link to={to}>
-      <Card className="p-4 card-hover">
-        <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${colorMap[color]}`}>
+      <Card className="p-4 card-hover tint-card" style={{ ["--tint" as any]: tintMap[color] }}>
+        <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${iconMap[color]}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="mt-3 text-2xl font-extrabold">{value}</div>
@@ -143,6 +149,7 @@ function StatCard({ icon: Icon, label, value, color, to }: any) {
     </Link>
   );
 }
+
 
 function EmptyState({ msg, cta, to }: { msg: string; cta: string; to: string }) {
   return (
