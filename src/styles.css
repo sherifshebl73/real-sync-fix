@@ -38,7 +38,11 @@
   --color-navy: var(--navy);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-lilac: var(--lilac);
+  --color-rose: var(--rose);
   --color-sidebar: var(--sidebar);
+
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
