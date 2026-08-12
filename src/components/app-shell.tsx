@@ -47,7 +47,7 @@ export function AppShell() {
     exact ? loc.pathname === to : loc.pathname === to || loc.pathname.startsWith(to + "/");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background app-canvas">
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-40 border-b bg-card/80 backdrop-blur md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
